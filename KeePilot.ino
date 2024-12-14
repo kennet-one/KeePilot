@@ -34,7 +34,6 @@ void loop() {
       startInputMode();
     }
   }
-
     // Якщо активний режим введення
   if (isInputMode) {
     handleInput();
@@ -85,7 +84,11 @@ void handleInput() {
         }
 
         // Оновлюємо екран
-      canvas.fillSprite(BLACK);
+      if (isInputMode == false){
+        canvas.fillSprite(BLACK);
+      } else {
+        canvas.fillSprite(0x404040);
+      }
       canvas.setCursor(0, 0);
       canvas.print(inputData);
       canvas.pushSprite(0, 135 - 28);
