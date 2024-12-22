@@ -91,6 +91,9 @@ void handleInput() {
       std::string pressedKey(state.word.begin(), state.word.end());
 
       for (char c : state.word) {
+        if (state.opt && c == 's') { // пропустити як нажате комбо
+          continue;
+        }
         inputData += c;
       }
 
