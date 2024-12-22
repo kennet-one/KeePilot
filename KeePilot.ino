@@ -89,7 +89,15 @@ void handleInput() {
     if (M5Cardputer.Keyboard.isPressed()) {
       Keyboard_Class::KeysState state = M5Cardputer.Keyboard.keysState();
       std::string pressedKey(state.word.begin(), state.word.end());
-
+      
+      if (pressedKey == "`") {
+        isInputMode = false;
+        inputData = "";
+        canvas.fillSprite(BLACK);
+        canvas.pushSprite(0, 135 - 28);
+        showMainScreen();
+        return; // Припиняємо подальшу обробку
+      }
       for (char c : state.word) {
         if (state.opt && c == 's') { // пропустити як нажате комбо
           continue;
@@ -168,7 +176,7 @@ void loop() {
       }
     }
 
-    if (projectorPilotMode && M5Cardputer.Keyboard.isPressed()) {
+    if (projectorPilotMode && M5Cardputer.Keyboard.isPressed()) { 
       Keyboard_Class::KeysState state = M5Cardputer.Keyboard.keysState();
       std::string pressedKey(state.word.begin(), state.word.end());
       if (pressedKey == "`") {
