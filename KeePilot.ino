@@ -175,7 +175,9 @@ void loop() {
         projectorPilotMode = false;
         showMainScreen();
       } else if (pressedKey == "p") {
-        sendIRCommand();
+        if (!state.opt) {
+          sendIRCommand();
+        }
       }
     }
 
