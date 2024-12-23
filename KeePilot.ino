@@ -89,21 +89,32 @@ void handleInput() {
     if (M5Cardputer.Keyboard.isPressed()) {
       Keyboard_Class::KeysState state = M5Cardputer.Keyboard.keysState();
       std::string pressedKey(state.word.begin(), state.word.end());
-      
-      if (pressedKey == "`") {
-        isInputMode = false;
-        inputData = "";
-        canvas.fillSprite(BLACK);
-        canvas.pushSprite(0, 135 - 28);
-        showMainScreen();
-        return; // Припиняємо подальшу обробку
-      }
-      for (char c : state.word) {
-        if (state.opt && c == 's') { // пропустити як нажате комбо
-          continue;
+
+      for (char x : state.word) {
+        switch (x) {
+          case '`'://бектік, виходимо з режиму вводу
+            isInputMode = false;
+            inputData = "";
+            canvas.fillSprite(BLACK);
+            canvas.pushSprite(0, 135 - 28);
+            showMainScreen();
+            return; 
+
+          case 's':
+            if (state.opt) { //'s' із OPT в пустоту
+              //Нічого в inputData
+              break;
+            }
+            inputData += x;  //'s' без OPT +
+            break;
+
+          default:
+            // Усі інші до рядка
+            inputData += x;
+            break;
         }
-        inputData += c;
       }
+
 
       if (state.del && inputData.length() > 2) {
         inputData.remove(inputData.length() - 1);
@@ -119,7 +130,7 @@ void handleInput() {
         canvas.pushSprite(0, 135 - 28);
       }
 
-      if (!isInputMode) {
+      if (!isInputMode) {  //чи ми ще у режимі вводу, оновлюємо спрайт
         canvas.fillSprite(BLACK);
       } else {
         canvas.fillSprite(0x404040);
