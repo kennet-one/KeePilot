@@ -89,10 +89,11 @@ void handleInput() {
     if (M5Cardputer.Keyboard.isPressed()) {
       Keyboard_Class::KeysState state = M5Cardputer.Keyboard.keysState();
       std::string pressedKey(state.word.begin(), state.word.end());
-
+// ;-up// .-d// ,-L// /-R// 
       for (char x : state.word) {
         switch (x) {
           case '`'://бектік, виходимо з режиму вводу
+            projectorPilotMode = false;
             isInputMode = false;
             inputData = "";
             canvas.fillSprite(BLACK);
@@ -103,6 +104,46 @@ void handleInput() {
           case 's':
             if (state.opt) { //'s' із OPT в пустоту
               //Нічого в inputData
+              break;
+            }
+            inputData += x;  //'s' без OPT +
+            break;
+
+          case ';': // в верх
+            if (projectorPilotMode) { //'s' із OPT в пустоту
+              //Нічого в inp
+              break;
+            }
+            break;
+            
+          case '.': // вниз
+            if (projectorPilotMode) { //'s' із OPT в пустоту
+              //Нічого в inputData
+              break;
+            }
+            break;
+
+          case ',': // вліво
+            if (projectorPilotMode) { //'s' із OPT в пустоту
+              //Нічого в inputData
+              break;
+            }
+            break;
+
+          case '/': // вправо
+            if (projectorPilotMode) { //'s' із OPT в пустоту
+              //Нічого в inputData
+              break;
+            }
+            break;
+
+          case 'p':
+            if (state.opt) { //'p' із OPT в пустоту
+              //Нічого в inputData
+              break;
+            }
+            if (projectorPilotMode) { 
+              sendIRCommand();
               break;
             }
             inputData += x;  //'s' без OPT +
@@ -120,6 +161,18 @@ void handleInput() {
         inputData.remove(inputData.length() - 1);
       }
 
+      if (state.opt && pressedKey == "s") {
+        isInputMode = true;
+        projectorPilotMode = false; 
+        startInputMode();
+      }
+
+      if (state.opt && pressedKey == "p") {
+        isInputMode = false;
+        projectorPilotMode = true; 
+        showProjectorPilotScreen();
+      }
+
       if (state.enter) {
         isInputMode = false;  
         String savedText = inputData.substring(2);  
@@ -133,7 +186,7 @@ void handleInput() {
       if (!isInputMode) {  //чи ми ще у режимі вводу, оновлюємо спрайт
         canvas.fillSprite(BLACK);
       } else {
-        canvas.fillSprite(0x404040);
+        canvas.fillSprite(0x404040); // тут може бути баг спрайта
       }
       canvas.setCursor(0, 0);
       canvas.print(inputData);
@@ -171,44 +224,8 @@ void setup() {
 
 void loop() {
   mesh.update();
+
   M5Cardputer.update();  
 
-  // Якщо активний режим вводу, він має пріоритет
-  if (isInputMode) {
-    handleInput();
-  } else {
-    // Режим вводу не активний, перевіряємо пілотний режим
-    if (M5Cardputer.Keyboard.isPressed() && !projectorPilotMode) {
-      Keyboard_Class::KeysState state = M5Cardputer.Keyboard.keysState();
-      std::string pressedKey(state.word.begin(), state.word.end());
-      if (state.opt && pressedKey == "p") {
-        projectorPilotMode = true;
-        showProjectorPilotScreen();
-      }
-    }
-
-    if (projectorPilotMode && M5Cardputer.Keyboard.isPressed()) { 
-      Keyboard_Class::KeysState state = M5Cardputer.Keyboard.keysState();
-      std::string pressedKey(state.word.begin(), state.word.end());
-      if (pressedKey == "`") {
-        projectorPilotMode = false;
-        showMainScreen();
-      } else if (pressedKey == "p") {
-        if (!state.opt) {
-          sendIRCommand();
-        }
-      }
-    }
-
-    // Перевірка ввімкнення режиму вводу (OPT+S) – має вищий пріоритет за пілота
-    if (M5Cardputer.Keyboard.isPressed()) {
-      Keyboard_Class::KeysState state = M5Cardputer.Keyboard.keysState();
-      std::string pressedKey(state.word.begin(), state.word.end());
-      if (state.opt && pressedKey == "s") {
-        isInputMode = true;
-        projectorPilotMode = false; 
-        startInputMode();
-      }
-    }
-  }
+  handleInput();
 }
