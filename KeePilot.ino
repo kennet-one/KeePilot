@@ -55,8 +55,7 @@ void showProjectorPilotScreen() {
   pilotModeSprite.pushSprite(0,0);
 }
 
-void sendIRCommand() {
-  IrSender.sendNECRaw(0xE21DFC03, 0);
+void sendIRCommand() {  // анімація
   indicatorSprite.fillScreen(BLACK);
   indicatorSprite.fillCircle(8, 8, 7, GREEN);
   indicatorSprite.pushSprite(32, 105);
@@ -110,31 +109,52 @@ void handleInput() {
             break;
 
           case ';': // в верх
-            if (projectorPilotMode) { //'s' із OPT в пустоту
-              //Нічого в inp
+            if (projectorPilotMode) { 
+              IrSender.sendNECRaw(0xF609FC03, 0);
+              sendIRCommand();
               break;
             }
             break;
             
           case '.': // вниз
-            if (projectorPilotMode) { //'s' із OPT в пустоту
-              //Нічого в inputData
+            if (projectorPilotMode) { 
+              IrSender.sendNECRaw(0xFE01FC03, 0);
+              sendIRCommand();
               break;
             }
             break;
 
           case ',': // вліво
-            if (projectorPilotMode) { //'s' із OPT в пустоту
-              //Нічого в inputData
+            if (projectorPilotMode) { 
+              IrSender.sendNECRaw(0xF708FC03, 0);
+              sendIRCommand();
               break;
             }
             break;
 
           case '/': // вправо
-            if (projectorPilotMode) { //'s' із OPT в пустоту
-              //Нічого в inputData
+            if (projectorPilotMode) { 
+              IrSender.sendNECRaw(0xF50AFC03, 0);
+              sendIRCommand();
               break;
             }
+            break;
+
+          case ' ': // вибор источніка
+            if (projectorPilotMode) { 
+              IrSender.sendNECRaw(0xE01FFC03, 0);
+              sendIRCommand();
+              break;
+            }
+            break;
+
+          case 'l': // ok
+            if (projectorPilotMode) { 
+              IrSender.sendNECRaw(0xF40BFC03, 0);
+              sendIRCommand();
+              break;
+            }
+            inputData += x;
             break;
 
           case 'p':
@@ -143,6 +163,7 @@ void handleInput() {
               break;
             }
             if (projectorPilotMode) { 
+              IrSender.sendNECRaw(0xE21DFC03, 0);
               sendIRCommand();
               break;
             }
