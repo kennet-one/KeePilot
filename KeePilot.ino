@@ -31,6 +31,7 @@ bool isInputMode = false;  // Режим введення тексту
 void showMainScreen() {
   mainScreenSprite.fillScreen(BLACK);
   mainScreenSprite.pushSprite(0,0);
+  inputData = "";
 }
 
 void showProjectorPilotScreen() {
@@ -183,12 +184,14 @@ void handleInput() {
       }
 
       if (state.opt && pressedKey == "s") {
+        showMainScreen();
         isInputMode = true;
         projectorPilotMode = false; 
         startInputMode();
       }
 
       if (state.opt && pressedKey == "p") {
+        showMainScreen();
         isInputMode = false;
         projectorPilotMode = true; 
         showProjectorPilotScreen();
@@ -204,7 +207,7 @@ void handleInput() {
         canvas.pushSprite(0, 135 - 28);
       }
 
-      if (!isInputMode) {  //чи ми ще у режимі вводу, оновлюємо спрайт
+      if (!isInputMode ) {  //чи ми ще у режимі вводу, оновлюємо спрайт
         canvas.fillSprite(BLACK);
       } else {
         canvas.fillSprite(0x404040); // тут може бути баг спрайта
