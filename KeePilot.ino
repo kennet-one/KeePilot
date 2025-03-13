@@ -5,29 +5,16 @@
 #include <IRremote.hpp>
 
 //------------------------ MESH НАЛАШТУВАННЯ ------------------------
-Scheduler userScheduler; 
+Scheduler userScheduler;
 painlessMesh  mesh;
-
-//void receivedCallback( uint32_t from, String &msg ) {
-  // Обробка отриманих повідомлень, якщо потрібно
-//}
-
-//void newConnectionCallback(uint32_t nodeId) {}
-//void changedConnectionCallback() {}
-//void nodeTimeAdjustedCallback(int32_t offset) {}
+//------------------------до введення тексту---------------------------
+String inputData = "";
+bool isInputMode = false;  // Режим введення тексту
 //------------------------спрайти---------------------------
 LGFX_Sprite mainScreenSprite(&M5Cardputer.Display);
 LGFX_Sprite pilotModeSprite(&M5Cardputer.Display);
 LGFX_Sprite indicatorSprite(&M5Cardputer.Display);
 LGFX_Sprite inputSprite(&M5Cardputer.Display);
-//------------------------ IR НАЛАШТУВАННЯ --------------------------
-#define IR_TX_PIN 44
-bool projectorPilotMode = false; // Режим пілота
-
-//------------------------ ВВОД ТЕКСТУ ------------------------------
-
-String inputData = "";
-bool isInputMode = false;  // Режим введення тексту
 
 void showMainScreen() {
   mainScreenSprite.fillScreen(BLACK);
@@ -41,18 +28,32 @@ void showProjectorPilotScreen() {
   pilotModeSprite.setTextColor(GREEN);
   pilotModeSprite.setTextDatum(middle_center);
   pilotModeSprite.setTextSize(1);
+                    // ;-up// .-d// ,-L// /-R// ок
+  pilotModeSprite.drawString("ProjectorPilot Mode",120,12);
+  pilotModeSprite.drawFastHLine(0, 20, pilotModeSprite.width(), RED);
 
-  pilotModeSprite.drawString("ProjectorPilot Mode",
-                             pilotModeSprite.width()/2,
-                             pilotModeSprite.height()/2 - 40);
+  pilotModeSprite.drawString("P-power" ,50, 50);
+  pilotModeSprite.drawString("`-exit", 140, 50);
+  pilotModeSprite.drawString("L-ok", 210, 50);
+  pilotModeSprite.drawString("space-sourse", 160, 75);
 
-  pilotModeSprite.drawString("Press P to send IR",
-                             pilotModeSprite.width()/2,
-                             pilotModeSprite.height()/2);
+  //pilotModeSprite.drawString("↑", 60, 75);
+  //pilotModeSprite.drawString("← ↓ →", 60, 100);
+  
+  pilotModeSprite.drawTriangle(60, 70, 55, 80, 65, 80, GREEN);
+  pilotModeSprite.fillTriangle(60, 70, 55, 80, 65, 80, GREEN);
 
-  pilotModeSprite.drawString("Press ` to exit",
-                             pilotModeSprite.width()/2,
-                             pilotModeSprite.height()/2 + 40);
+  // ↓ (вниз)
+  pilotModeSprite.drawTriangle(60, 110, 55, 100, 65, 100, GREEN);
+  pilotModeSprite.fillTriangle(60, 110, 55, 100, 65, 100, GREEN);
+
+  // ← (вліво)
+  pilotModeSprite.drawTriangle(40, 90, 50, 85, 50, 95, GREEN);
+  pilotModeSprite.fillTriangle(40, 90, 50, 85, 50, 95, GREEN);
+
+  // → (вправо)
+  pilotModeSprite.drawTriangle(80, 90, 70, 85, 70, 95, GREEN);
+  pilotModeSprite.fillTriangle(80, 90, 70, 85, 70, 95, GREEN);
 
   pilotModeSprite.pushSprite(0,0);
 }
@@ -84,13 +85,18 @@ void startInputMode() {
   inputSprite.print(inputData);
   inputSprite.pushSprite(0, 135 - 28);
 }
+//------------------------ IR НАЛАШТУВАННЯ --------------------------
+#define IR_TX_PIN 44
+bool projectorPilotMode = false; // Режим пілота
+
+//------------------------ ВВОД ТЕКСТУ ------------------------------
 
 void handleInput() {
   if (M5Cardputer.Keyboard.isChange()) {
     if (M5Cardputer.Keyboard.isPressed()) {
       Keyboard_Class::KeysState state = M5Cardputer.Keyboard.keysState();
       std::string pressedKey(state.word.begin(), state.word.end());
-                    // ;-up// .-d// ,-L// /-R// 
+
       for (char x : state.word) {
         switch (x) {
           case '`'://бектік, виходимо з режиму вводу
@@ -217,10 +223,6 @@ void handleInput() {
 
 void setup() {
   mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
-  //mesh.onReceive(&receivedCallback);
-  //mesh.onNewConnection(&newConnectionCallback);
-  //mesh.onChangedConnections(&changedConnectionCallback);
-  //mesh.onNodeTimeAdjusted(&nodeTimeAdjustedCallback);
 
   auto cfg = M5.config();
   M5Cardputer.begin(cfg, true);
