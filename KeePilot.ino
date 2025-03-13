@@ -15,16 +15,17 @@ painlessMesh  mesh;
 //void newConnectionCallback(uint32_t nodeId) {}
 //void changedConnectionCallback() {}
 //void nodeTimeAdjustedCallback(int32_t offset) {}
-
-//------------------------ IR НАЛАШТУВАННЯ --------------------------
-#define IR_TX_PIN 44
-bool projectorPilotMode = false; // Режим пілота
+//------------------------спрайти---------------------------
 LGFX_Sprite mainScreenSprite(&M5Cardputer.Display);
 LGFX_Sprite pilotModeSprite(&M5Cardputer.Display);
 LGFX_Sprite indicatorSprite(&M5Cardputer.Display);
+LGFX_Sprite inputSprite(&M5Cardputer.Display);
+//------------------------ IR НАЛАШТУВАННЯ --------------------------
+#define IR_TX_PIN 44
+bool projectorPilotMode = false; // Режим пілота
 
 //------------------------ ВВОД ТЕКСТУ ------------------------------
-M5Canvas canvas(&M5Cardputer.Display);
+
 String inputData = "";
 bool isInputMode = false;  // Режим введення тексту
 
@@ -56,7 +57,7 @@ void showProjectorPilotScreen() {
   pilotModeSprite.pushSprite(0,0);
 }
 
-void sendIRCommand() {  // анімація
+void sendIRCommand() {  // анімація значка передачі
   indicatorSprite.fillScreen(BLACK);
   indicatorSprite.fillCircle(8, 8, 7, GREEN);
   indicatorSprite.pushSprite(32, 105);
@@ -74,14 +75,14 @@ void startInputMode() {
   isInputMode = true;  // Увімкнути режим введення
   inputData = "> ";    // Додаємо символ вводу
 
-  canvas.createSprite(240, 28);
-  canvas.fillSprite(0x404040);  
-  canvas.setTextFont(&fonts::Font4);
-  canvas.setTextSize(1);
-  canvas.setTextColor(WHITE);
-  canvas.setCursor(0, 0);
-  canvas.print(inputData);
-  canvas.pushSprite(0, 135 - 28);
+  inputSprite.createSprite(240, 28);
+  inputSprite.fillSprite(0x404040);  
+  inputSprite.setTextFont(&fonts::Font4);
+  inputSprite.setTextSize(1);
+  inputSprite.setTextColor(WHITE);
+  inputSprite.setCursor(0, 0);
+  inputSprite.print(inputData);
+  inputSprite.pushSprite(0, 135 - 28);
 }
 
 void handleInput() {
@@ -89,15 +90,15 @@ void handleInput() {
     if (M5Cardputer.Keyboard.isPressed()) {
       Keyboard_Class::KeysState state = M5Cardputer.Keyboard.keysState();
       std::string pressedKey(state.word.begin(), state.word.end());
-// ;-up// .-d// ,-L// /-R// 
+                    // ;-up// .-d// ,-L// /-R// 
       for (char x : state.word) {
         switch (x) {
           case '`'://бектік, виходимо з режиму вводу
             projectorPilotMode = false;
             isInputMode = false;
             inputData = "";
-            canvas.fillSprite(BLACK);
-            canvas.pushSprite(0, 135 - 28);
+            inputSprite.fillSprite(BLACK);
+            inputSprite.pushSprite(0, 135 - 28);
             showMainScreen();
             return; 
 
@@ -203,18 +204,13 @@ void handleInput() {
         inputData = "";  
         mesh.sendBroadcast(savedText);
 
-        canvas.fillSprite(BLACK);
-        canvas.pushSprite(0, 135 - 28);
+        inputSprite.fillSprite(BLACK);
+        inputSprite.pushSprite(0, 135 - 28);
       }
 
-      if (!isInputMode ) {  //чи ми ще у режимі вводу, оновлюємо спрайт
-        canvas.fillSprite(BLACK);
-      } else {
-        canvas.fillSprite(0x404040); // тут може бути баг спрайта
-      }
-      canvas.setCursor(0, 0);
-      canvas.print(inputData);
-      canvas.pushSprite(0, 135 - 28);
+      if (!isInputMode ) {  // удаляем ненужний спрайт вводу
+        inputSprite.deleteSprite();
+      } 
     }
   }
 }
