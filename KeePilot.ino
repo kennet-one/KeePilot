@@ -17,9 +17,56 @@ LGFX_Sprite indicatorSprite(&M5Cardputer.Display);
 LGFX_Sprite inputSprite(&M5Cardputer.Display);
 
 void showMainScreen() {
-  mainScreenSprite.fillScreen(BLACK);
-  mainScreenSprite.pushSprite(0,0);
   inputData = "";
+  mainScreenSprite.fillScreen(BLACK);
+
+  int voltageMilliVolt = M5Cardputer.Power.getBatteryVoltage();
+  float voltage = voltageMilliVolt / 1000.0;  
+
+  char voltageText[10];
+  sprintf(voltageText, "%.2fV", voltage);
+
+  mainScreenSprite.setFont(&fonts::Font4);
+  mainScreenSprite.setTextSize(1);
+  mainScreenSprite.setTextColor(WHITE);
+  mainScreenSprite.setTextDatum(top_right);
+
+  int screenWidth = mainScreenSprite.width();
+
+  // Виводимо текст вольтажу в правий верхній кут з відступом
+  mainScreenSprite.drawString(voltageText, screenWidth - 4, 2);
+
+  // Розміри і позиція індикатора батареї
+  const int battWidth = 26;   // Загальна ширина іконки батареї
+  const int battHeight = 12;  // Висота іконки батареї
+  const int battX = screenWidth - battWidth - 100; // Посунули значно лівіше від тексту
+  const int battY = 3;
+
+  // Малюємо контур батареї
+  mainScreenSprite.drawRect(battX, battY, battWidth, battHeight, WHITE);
+  mainScreenSprite.fillRect(battX + battWidth, battY + 3, 2, 6, WHITE); // Носик батареї
+
+  // Обчислюємо рівень заряду в %
+  int batteryPercent = map(voltageMilliVolt, 330, 420, 0, 100);
+  batteryPercent = constrain(batteryPercent, 0, 100);
+
+  // Ширина заповнення (22 - з невеликими полями)
+  int fillWidth = map(batteryPercent, 0, 70, 0, battWidth - 4);
+
+  // Заповнення батареї відповідно до рівня заряду
+  uint16_t fillColor = batteryPercent > 20 ? GREEN : RED;
+  mainScreenSprite.fillRect(battX + 2, battY + 2, fillWidth, battHeight - 4, fillColor);
+
+  // Показуємо індикатор зарядки (маленька блискавка зліва)
+  //if (M5Cardputer.Power.isCharging()) {
+    // Блискавка з ліній 
+  //  int cx = battX - 12;
+  //  int cy = battY + 2;
+  //  mainScreenSprite.drawLine(cx + 3, cy, cx, cy + 5, YELLOW);
+  //  mainScreenSprite.drawLine(cx, cy + 5, cx + 4, cy + 5, YELLOW);
+  //  mainScreenSprite.drawLine(cx + 4, cy + 5, cx, cy + 10, YELLOW);
+  //}
+  mainScreenSprite.pushSprite(0, 0);
 }
 
 void showProjectorPilotScreen() {
