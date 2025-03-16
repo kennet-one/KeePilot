@@ -51,25 +51,19 @@ void showProjectorPilotScreen() {
 
   pilotModeSprite.drawString("P-power" ,50, 50);
   pilotModeSprite.drawString("`-exit", 140, 50);
-  pilotModeSprite.drawString("L-ok", 210, 50);
+  pilotModeSprite.drawString("ok", 210, 50);
   pilotModeSprite.drawString("space-sourse", 160, 75);
-
-  //pilotModeSprite.drawString("↑", 60, 75);
-  //pilotModeSprite.drawString("← ↓ →", 60, 100);
   
-  pilotModeSprite.drawTriangle(60, 70, 55, 80, 65, 80, GREEN);
+  pilotModeSprite.drawTriangle(60, 70, 55, 80, 65, 80, GREEN); // в верх
   pilotModeSprite.fillTriangle(60, 70, 55, 80, 65, 80, GREEN);
 
-  // ↓ (вниз)
-  pilotModeSprite.drawTriangle(60, 110, 55, 100, 65, 100, GREEN);
+  pilotModeSprite.drawTriangle(60, 110, 55, 100, 65, 100, GREEN);  // ↓ (вниз)
   pilotModeSprite.fillTriangle(60, 110, 55, 100, 65, 100, GREEN);
 
-  // ← (вліво)
-  pilotModeSprite.drawTriangle(40, 90, 50, 85, 50, 95, GREEN);
+  pilotModeSprite.drawTriangle(40, 90, 50, 85, 50, 95, GREEN);  // ← (вліво)
   pilotModeSprite.fillTriangle(40, 90, 50, 85, 50, 95, GREEN);
 
-  // → (вправо)
-  pilotModeSprite.drawTriangle(80, 90, 70, 85, 70, 95, GREEN);
+  pilotModeSprite.drawTriangle(80, 90, 70, 85, 70, 95, GREEN);  // → (вправо)
   pilotModeSprite.fillTriangle(80, 90, 70, 85, 70, 95, GREEN);
 
   pilotModeSprite.pushSprite(0,0);
@@ -173,15 +167,6 @@ void handleInput() {
             }
             break;
 
-          case 'l': // ok
-            if (projectorPilotMode) { 
-              IrSender.sendNECRaw(0xF40BFC03, 0);
-              sendIRCommand();
-              break;
-            }
-            inputData += x;
-            break;
-
           case 'p':
             if (state.opt) { //'p' із OPT в пустоту
               //Нічого в inputData
@@ -221,19 +206,31 @@ void handleInput() {
         showProjectorPilotScreen();
       }
 
-      if (state.enter) {
+      if (state.enter && isInputMode) {
         isInputMode = false;  
-        String savedText = inputData.substring(2);  
-        inputData = "";  
+        String savedText = inputData.substring(2);    
         mesh.sendBroadcast(savedText);
 
         inputSprite.fillSprite(BLACK);
         inputSprite.pushSprite(0, 135 - 28);
       }
 
-      if (!isInputMode ) {  // удаляем ненужний спрайт вводу
+      if (state.enter && projectorPilotMode) {
+        if (projectorPilotMode) { 
+          IrSender.sendNECRaw(0xF40BFC03, 0);
+          sendIRCommand();
+        }
+      }
+
+      if (isInputMode) {
+        inputSprite.fillSprite(0x404040);
+        inputSprite.setCursor(0, 0);
+        inputSprite.setTextColor(WHITE);
+        inputSprite.print(inputData);
+        inputSprite.pushSprite(0, 135 - 28);
+      } else {// удаляем ненужний спрайт вводу
         inputSprite.deleteSprite();
-      } 
+      }
     }
   }
 }
