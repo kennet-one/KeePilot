@@ -7,66 +7,109 @@
 //------------------------ MESH НАЛАШТУВАННЯ ------------------------
 Scheduler userScheduler;
 painlessMesh  mesh;
-//------------------------до введення тексту---------------------------
+//---------------------------------------------------
 String inputData = "";
 bool isInputMode = false;  // Режим введення тексту
+
+#define IR_TX_PIN 44
+bool projectorPilotMode = false; // Режим пілота
 //------------------------спрайти---------------------------
 LGFX_Sprite mainScreenSprite(&M5Cardputer.Display);
 LGFX_Sprite pilotModeSprite(&M5Cardputer.Display);
 LGFX_Sprite indicatorSprite(&M5Cardputer.Display);
 LGFX_Sprite inputSprite(&M5Cardputer.Display);
 
-void showMainScreen() {
-  inputData = "";
-  mainScreenSprite.fillScreen(BLACK);
+enum CORESCREEN {    
+  OS0,
+  OS1,
+  OS2,
+  OS3,
+  OS4
+} screen = OS0;
 
-  int voltageMilliVolt = M5Cardputer.Power.getBatteryVoltage();
-  float voltage = voltageMilliVolt / 1000.0;  
+void coreScreen () {
+  switch (screen) {
+    case OS0: {
+      mainScreenSprite.fillScreen(BLACK);
 
-  char voltageText[10];
-  sprintf(voltageText, "%.2fV", voltage);
+      int voltageMilliVolt = M5Cardputer.Power.getBatteryVoltage();
+      float voltage = voltageMilliVolt / 1000.0;  
 
-  mainScreenSprite.setFont(&fonts::Font4);
-  mainScreenSprite.setTextSize(1);
-  mainScreenSprite.setTextColor(WHITE);
-  mainScreenSprite.setTextDatum(top_right);
+      char voltageText[10];
+      sprintf(voltageText, "%.2fV", voltage);
 
-  int screenWidth = mainScreenSprite.width();
+      mainScreenSprite.setFont(&fonts::Font4);
+      mainScreenSprite.setTextSize(1);
+      mainScreenSprite.setTextColor(WHITE);
+      mainScreenSprite.setTextDatum(top_right);
 
-  // Виводимо текст вольтажу в правий верхній кут
-  mainScreenSprite.drawString(voltageText, screenWidth - 4, 2);
-
-  mainScreenSprite.pushSprite(0, 0);
-}
-
-void showProjectorPilotScreen() {
-  pilotModeSprite.fillScreen(BLACK);
-  pilotModeSprite.setTextFont(&fonts::Font4); // Менший шрифт
-  pilotModeSprite.setTextColor(GREEN);
-  pilotModeSprite.setTextDatum(middle_center);
-  pilotModeSprite.setTextSize(1);
-                    // ;-up// .-d// ,-L// /-R// ок
-  pilotModeSprite.drawString("ProjectorPilot Mode",120,12);
-  pilotModeSprite.drawFastHLine(0, 20, pilotModeSprite.width(), RED);
-
-  pilotModeSprite.drawString("P-power" ,50, 50);
-  pilotModeSprite.drawString("`-exit", 140, 50);
-  pilotModeSprite.drawString("ok", 210, 50);
-  pilotModeSprite.drawString("space-sourse", 160, 75);
+      int screenWidth = mainScreenSprite.width();
   
-  pilotModeSprite.drawTriangle(60, 70, 55, 80, 65, 80, GREEN); // в верх
-  pilotModeSprite.fillTriangle(60, 70, 55, 80, 65, 80, GREEN);
+      mainScreenSprite.drawString(voltageText, screenWidth - 4, 2); // Виводимо текст вольтажу в правий верхній кут
 
-  pilotModeSprite.drawTriangle(60, 110, 55, 100, 65, 100, GREEN);  // ↓ (вниз)
-  pilotModeSprite.fillTriangle(60, 110, 55, 100, 65, 100, GREEN);
+      mainScreenSprite.pushSprite(0, 0);
+      }
+      break;
 
-  pilotModeSprite.drawTriangle(40, 90, 50, 85, 50, 95, GREEN);  // ← (вліво)
-  pilotModeSprite.fillTriangle(40, 90, 50, 85, 50, 95, GREEN);
+    case OS1: {
+      mainScreenSprite.deleteSprite();
+        
+      isInputMode = true;  // Увімкнути режим введення
+      inputData = "> ";    // Додаємо символ вводу
 
-  pilotModeSprite.drawTriangle(80, 90, 70, 85, 70, 95, GREEN);  // → (вправо)
-  pilotModeSprite.fillTriangle(80, 90, 70, 85, 70, 95, GREEN);
+      inputSprite.createSprite(240, 28);
+      inputSprite.fillSprite(0x404040);  
+      inputSprite.setTextFont(&fonts::Font4);
+      inputSprite.setTextSize(1);
+      inputSprite.setTextColor(WHITE);
+      inputSprite.setCursor(0, 0);
+      inputSprite.print(inputData);
 
-  pilotModeSprite.pushSprite(0,0);
+      inputSprite.pushSprite(0, 135 - 28);
+      }
+      break;
+
+    case OS2: {
+      inputSprite.deleteSprite();
+
+      pilotModeSprite.fillScreen(BLACK);
+      pilotModeSprite.setTextFont(&fonts::Font4); // Менший шрифт
+      pilotModeSprite.setTextColor(GREEN);
+      pilotModeSprite.setTextDatum(middle_center);
+      pilotModeSprite.setTextSize(1);
+                    // ;-up// .-d// ,-L// /-R// ок
+      pilotModeSprite.drawString("ProjectorPilot Mode",120,12);
+      pilotModeSprite.drawFastHLine(0, 20, pilotModeSprite.width(), RED);
+
+      pilotModeSprite.drawString("P-power" ,50, 50);
+      pilotModeSprite.drawString("`-exit", 140, 50);
+      pilotModeSprite.drawString("ok", 210, 50);
+      pilotModeSprite.drawString("space-sourse", 160, 75);
+  
+      pilotModeSprite.drawTriangle(60, 70, 55, 80, 65, 80, GREEN); // в верх
+      pilotModeSprite.fillTriangle(60, 70, 55, 80, 65, 80, GREEN);
+
+      pilotModeSprite.drawTriangle(60, 110, 55, 100, 65, 100, GREEN);  // ↓ (вниз)
+      pilotModeSprite.fillTriangle(60, 110, 55, 100, 65, 100, GREEN);
+
+      pilotModeSprite.drawTriangle(40, 90, 50, 85, 50, 95, GREEN);  // ← (вліво)
+      pilotModeSprite.fillTriangle(40, 90, 50, 85, 50, 95, GREEN);
+
+      pilotModeSprite.drawTriangle(80, 90, 70, 85, 70, 95, GREEN);  // → (вправо)
+      pilotModeSprite.fillTriangle(80, 90, 70, 85, 70, 95, GREEN);
+
+      pilotModeSprite.pushSprite(0,0);
+      }
+      break;
+
+    //case OS3: {}
+      
+      //break;
+
+    //case OS4: {}
+
+      //break;
+  }
 }
 
 void sendIRCommand() {  // анімація значка передачі
@@ -80,25 +123,7 @@ void sendIRCommand() {  // анімація значка передачі
   indicatorSprite.pushSprite(32, 105);
   delay(500);
 
-  showProjectorPilotScreen();
 }
-
-void startInputMode() {
-  isInputMode = true;  // Увімкнути режим введення
-  inputData = "> ";    // Додаємо символ вводу
-
-  inputSprite.createSprite(240, 28);
-  inputSprite.fillSprite(0x404040);  
-  inputSprite.setTextFont(&fonts::Font4);
-  inputSprite.setTextSize(1);
-  inputSprite.setTextColor(WHITE);
-  inputSprite.setCursor(0, 0);
-  inputSprite.print(inputData);
-  inputSprite.pushSprite(0, 135 - 28);
-}
-//------------------------ IR НАЛАШТУВАННЯ --------------------------
-#define IR_TX_PIN 44
-bool projectorPilotMode = false; // Режим пілота
 
 //------------------------ ВВОД ТЕКСТУ ------------------------------
 
@@ -116,8 +141,8 @@ void handleInput() {
             inputData = "";
             inputSprite.fillSprite(BLACK);
             inputSprite.pushSprite(0, 135 - 28);
-            showMainScreen();
-            return; 
+            screen = OS0;
+            break; 
 
           case 's':
             if (state.opt) { //'s' із OPT в пустоту
@@ -193,17 +218,15 @@ void handleInput() {
       }
 
       if (state.opt && pressedKey == "s") {
-        showMainScreen();
         isInputMode = true;
         projectorPilotMode = false; 
-        startInputMode();
+        screen = OS1;
       }
 
       if (state.opt && pressedKey == "p") {
-        showMainScreen();
         isInputMode = false;
         projectorPilotMode = true; 
-        showProjectorPilotScreen();
+        screen = OS2;
       }
 
       if (state.enter && isInputMode) {
@@ -222,14 +245,10 @@ void handleInput() {
         }
       }
 
-      if (isInputMode) {
-        inputSprite.fillSprite(0x404040);
-        inputSprite.setCursor(0, 0);
-        inputSprite.setTextColor(WHITE);
-        inputSprite.print(inputData);
-        inputSprite.pushSprite(0, 135 - 28);
-      } else {// удаляем ненужний спрайт вводу
+      if (!isInputMode) {
+        // удаляем ненужний спрайт вводу
         inputSprite.deleteSprite();
+        inputData = "";
       }
     }
   }
@@ -255,10 +274,12 @@ void setup() {
   pilotModeSprite.createSprite(w, h);
   indicatorSprite.createSprite(16, 16);
 
-  showMainScreen();
 }
 
 void loop() {
+
+  coreScreen();
+
   mesh.update();
 
   M5Cardputer.update();  
