@@ -22,99 +22,99 @@ LGFX_Sprite pilotModeSprite(&M5Cardputer.Display);
 LGFX_Sprite indicatorSprite(&M5Cardputer.Display);
 LGFX_Sprite inputSprite(&M5Cardputer.Display);
 
-//------------------------ СТАНИ / ЕКРАНИ ----------------------
-// Наприклад, OS0 (головний екран), OS1 (екран введення тексту), OS2 (пілот проектору)
+//------------------------ ЕКРАНИ (ENUM) ----------------------
 enum CORESCREEN {
-  OS0,
-  OS1,
-  OS2,
-  OS3,
+  OS0,   // Головний екран (вольтаж)
+  OS1,   // Екран введення
+  OS2,   // Пілот проектора
+  OS3,   // Меню (графічне)
   OS4
 } screen = OS0;
 
+//=============================================================
+//                МЕНЮ: СТРУКТУРА ТА ЛОГІКА
+//=============================================================
+struct MenuItem {
+  const char* title;    // Назва в меню
+  bool isAction;        // якщо true => виконуємо дію
+  MenuItem* submenu;    // підменю
+  int submenuCount;
+};
+
+// Підменю (приклад) — лампа
+MenuItem lampSubmenu[] = {
+  {"Turn ON",      true, nullptr, 0},
+  {"Turn OFF",     true, nullptr, 0},
+  {"Brightness",   true, nullptr, 0},
+};
+// Підменю — обігрівач
+MenuItem heaterSubmenu[] = {
+  {"Turn ON",      true, nullptr, 0},
+  {"Turn OFF",     true, nullptr, 0},
+  {"Temp",         true, nullptr, 0},
+};
+// Підменю — камера
+MenuItem cameraSubmenu[] = {
+  {"Take Photo",   true, nullptr, 0},
+  {"Stream Video", true, nullptr, 0},
+};
+
+// Головне меню
+MenuItem mainMenuItems[] = {
+  {"Lamp",   false, lampSubmenu,   3},
+  {"Heater", false, heaterSubmenu, 3},
+  {"Camera", false, cameraSubmenu, 2},
+};
+int mainMenuCount = 3;
+
+// «Поточне» меню, по якому ми ходимо
+MenuItem* currentMenu     = mainMenuItems;
+int       currentMenuSize = mainMenuCount;
+int       selectedIndex   = 0;
+
+// Стек, щоб вертатися назад
+struct MenuState {
+  MenuItem* menu;
+  int menuSize;
+  int selected;
+};
+std::vector<MenuState> menuStack;
+
 //-------------------------------------------------------------
-// ФУНКЦІЯ ВІДМАЛЬОВУВАННЯ ПОТОЧНОГО ЕКРАНУ
+// Виконує дію пункту меню
 //-------------------------------------------------------------
-void coreScreen() {
-  switch (screen) {
-    //--- ГОЛОВНИЙ ЕКРАН (OS0) ---
-    case OS0: {
-      mainScreenSprite.fillScreen(BLACK);
+void performAction(const char* title) {
+  // Тут можеш викликати логіку smart home, IR, mesh тощо
+  mesh.sendBroadcast(String("Action: ") + title);
+}
 
-      // Правильне зчитування батареї (припустимо, що 407 -> 4.07В)
-      int voltageMilliVolt = M5Cardputer.Power.getBatteryVoltage();
-      float voltage        = voltageMilliVolt / 100.0;  // Замість 1000.0
+//-------------------------------------------------------------
+// Малюємо меню (стан OS3) на mainScreenSprite
+//-------------------------------------------------------------
+void drawMenu() {
+  mainScreenSprite.fillScreen(BLACK);
 
-      char voltageText[10];
-      sprintf(voltageText, "%.2fV", voltage);
+  mainScreenSprite.setFont(&fonts::Font4);
+  mainScreenSprite.setTextSize(1);
+  mainScreenSprite.setTextColor(WHITE);
+  mainScreenSprite.setTextDatum(textdatum_t::top_left);
 
-      mainScreenSprite.setFont(&fonts::Font4);
-      mainScreenSprite.setTextSize(1);
+  // Заголовок
+  mainScreenSprite.drawString("Menu (`,':exit/back)", 10, 5);
+
+  int startY = 30;
+  for (int i = 0; i < currentMenuSize; i++) {
+    int y = startY + i * 20;
+    if (i == selectedIndex) {
+      // Виділяємо пункт
+      mainScreenSprite.fillRect(0, y, mainScreenSprite.width(), 20, BLUE);
+      mainScreenSprite.setTextColor(BLACK);
+    } else {
       mainScreenSprite.setTextColor(WHITE);
-      mainScreenSprite.setTextDatum(top_right);
-
-      int screenWidth = mainScreenSprite.width();
-      // Виводимо вольтаж у правому верхньому куті
-      mainScreenSprite.drawString(voltageText, screenWidth - 4, 2);
-
-      mainScreenSprite.pushSprite(0, 0);
-      }
-      break;
-
-    //--- ЕКРАН ВВЕДЕННЯ ТЕКСТУ (OS1) ---
-    case OS1: {
-      // Режим введення вже встановлено у handleInput (isInputMode = true)
-      // Просто відмалюємо спрайт:
-      inputSprite.fillSprite(0x404040);
-      inputSprite.setFont(&fonts::Font4);
-      inputSprite.setTextSize(1);
-      inputSprite.setTextColor(WHITE);
-      inputSprite.setCursor(0, 0);
-
-      // Наприклад, inputData = "> "
-      inputSprite.print(inputData);
-      inputSprite.pushSprite(0, 135 - 28);
-      }
-      break;
-
-    //--- ЕКРАН "ПІЛОТ ПРОЕКТОРУ" (OS2) ---
-    case OS2: {
-      pilotModeSprite.fillScreen(BLACK);
-      pilotModeSprite.setTextFont(&fonts::Font4);
-      pilotModeSprite.setTextColor(GREEN);
-      pilotModeSprite.setTextDatum(middle_center);
-      pilotModeSprite.setTextSize(1);
-
-      pilotModeSprite.drawString("ProjectorPilot Mode", 120, 12);
-      pilotModeSprite.drawFastHLine(0, 20, pilotModeSprite.width(), RED);
-
-      pilotModeSprite.drawString("P-power",       50, 50);
-      pilotModeSprite.drawString("`-exit",       140, 50);
-      pilotModeSprite.drawString("ok",           210, 50);
-      pilotModeSprite.drawString("space-sourse", 160, 75);
-
-      // Стрілки малюємо трикутниками
-      // Вгору
-      pilotModeSprite.drawTriangle(60, 70, 55, 80, 65, 80, GREEN);
-      pilotModeSprite.fillTriangle(60, 70, 55, 80, 65, 80, GREEN);
-      // Вниз
-      pilotModeSprite.drawTriangle(60, 110, 55, 100, 65, 100, GREEN);
-      pilotModeSprite.fillTriangle(60, 110, 55, 100, 65, 100, GREEN);
-      // Вліво
-      pilotModeSprite.drawTriangle(40, 90, 50, 85, 50, 95, GREEN);
-      pilotModeSprite.fillTriangle(40, 90, 50, 85, 50, 95, GREEN);
-      // Вправо
-      pilotModeSprite.drawTriangle(80, 90, 70, 85, 70, 95, GREEN);
-      pilotModeSprite.fillTriangle(80, 90, 70, 85, 70, 95, GREEN);
-
-      pilotModeSprite.pushSprite(0, 0);
-      }
-      break;
-
-    // ДЛЯ ОС3, ОС4 — за потреби
-    default:
-      break;
+    }
+    mainScreenSprite.drawString(currentMenu[i].title, 10, y);
   }
+  mainScreenSprite.pushSprite(0, 0);
 }
 
 //-------------------------------------------------------------
@@ -133,141 +133,295 @@ void sendIRCommand() {
 }
 
 //-------------------------------------------------------------
-// ОБРОБКА КЛАВІАТУРИ
+// ГОЛОВНА ФУНКЦІЯ МАЛЮВАННЯ ЕКРАНІВ (CORE SCREEN)
 //-------------------------------------------------------------
-void handleInput() {
-  if (M5Cardputer.Keyboard.isChange()) {
-    if (M5Cardputer.Keyboard.isPressed()) {
-      Keyboard_Class::KeysState state = M5Cardputer.Keyboard.keysState();
-      std::string pressedKey(state.word.begin(), state.word.end());
+void coreScreen() {
+  switch (screen) {
+    //--- ГОЛОВНИЙ ЕКРАН (OS0) ---
+    case OS0: {
+      mainScreenSprite.fillScreen(BLACK);
 
-      for (char x : state.word) {
-        switch (x) {
-          case '`': // бектік: вихід з усіх режимів, назад на OS0
-            projectorPilotMode = false;
-            isInputMode        = false;
-            inputData          = "";
-            inputSprite.fillSprite(BLACK);
-            inputSprite.pushSprite(0, 135 - 28);
+      int voltageMilliVolt = M5Cardputer.Power.getBatteryVoltage();
+      float voltage        = voltageMilliVolt / 100.0;  // 407 -> 4.07
 
-            screen = OS0;
-            return;  // Щоб не обробляти інші символи
+      char voltageText[10];
+      sprintf(voltageText, "%.2fV", voltage);
 
-          case 's':
-            if (state.opt) { 
-              // 's' із OPT — ігноруємо
-              break;
-            }
-            inputData += x;  // 's' без OPT
-            break;
+      mainScreenSprite.setFont(&fonts::Font4);
+      mainScreenSprite.setTextSize(1);
+      mainScreenSprite.setTextColor(WHITE);
+      mainScreenSprite.setTextDatum(top_right);
 
-          case ';': // Вверх
-            if (projectorPilotMode) {
-              IrSender.sendNECRaw(0xF609FC03, 0);
-              sendIRCommand();
-              return;
-            }
-            break;
+      int screenWidth = mainScreenSprite.width();
+      mainScreenSprite.drawString(voltageText, screenWidth - 4, 2);
 
-          case '.': // Вниз
-            if (projectorPilotMode) { 
-              IrSender.sendNECRaw(0xFE01FC03, 0);
-              sendIRCommand();
-              return;
-            }
-            break;
-
-          case ',': // Вліво
-            if (projectorPilotMode) { 
-              IrSender.sendNECRaw(0xF708FC03, 0);
-              sendIRCommand();
-              return;
-            }
-            break;
-
-          case '/': // Вправо
-            if (projectorPilotMode) { 
-              IrSender.sendNECRaw(0xF50AFC03, 0);
-              sendIRCommand();
-              return;
-            }
-            break;
-
-          case ' ': // Вибір джерела
-            if (projectorPilotMode) { 
-              IrSender.sendNECRaw(0xE01FFC03, 0);
-              sendIRCommand();
-              return;
-            }
-            break;
-
-          case 'p':
-            if (state.opt) { 
-              // 'p' із OPT — ігноруємо
-              break;
-            }
-            if (projectorPilotMode) { 
-              IrSender.sendNECRaw(0xE21DFC03, 0);
-              sendIRCommand();
-              return;
-            }
-            inputData += x;  
-            break;
-
-          default:
-            // Усі інші символи
-            inputData += x;
-            break;
-        }
+      mainScreenSprite.pushSprite(0, 0);
       }
+      break;
 
-      // Якщо натиснули "del" і рядок довший за "> "
-      if (state.del && inputData.length() > 2) {
-        inputData.remove(inputData.length() - 1);
+    //--- ЕКРАН ВВЕДЕННЯ ТЕКСТУ (OS1) ---
+    case OS1: {
+      inputSprite.fillSprite(0x404040);
+      inputSprite.setFont(&fonts::Font4);
+      inputSprite.setTextSize(1);
+      inputSprite.setTextColor(WHITE);
+      inputSprite.setCursor(0, 0);
+
+      // Надрукуємо поточне inputData
+      inputSprite.print(inputData);
+      inputSprite.pushSprite(0, 135 - 28);
       }
+      break;
 
-      // Комбінація OPT + S => Ввімкнення режиму введення (OS1)
-      if (state.opt && pressedKey == "s") {
-        isInputMode        = true;
+    //--- ЕКРАН "ПІЛОТ ПРОЕКТОРА" (OS2) ---
+    case OS2: {
+      pilotModeSprite.fillScreen(BLACK);
+      pilotModeSprite.setFont(&fonts::Font4);
+      pilotModeSprite.setTextColor(GREEN);
+      pilotModeSprite.setTextDatum(middle_center);
+      pilotModeSprite.setTextSize(1);
+
+      pilotModeSprite.drawString("ProjectorPilot Mode", 120, 12);
+      pilotModeSprite.drawFastHLine(0, 20, pilotModeSprite.width(), RED);
+
+      pilotModeSprite.drawString("P-power",       50, 50);
+      pilotModeSprite.drawString("`-exit",       140, 50);
+      pilotModeSprite.drawString("ok",           210, 50);
+      pilotModeSprite.drawString("space-sourse", 160, 75);
+
+      // стрілки
+      pilotModeSprite.drawTriangle(60, 70, 55, 80, 65, 80, GREEN);
+      pilotModeSprite.fillTriangle(60, 70, 55, 80, 65, 80, GREEN);
+      pilotModeSprite.drawTriangle(60, 110, 55, 100, 65, 100, GREEN);
+      pilotModeSprite.fillTriangle(60, 110, 55, 100, 65, 100, GREEN);
+      pilotModeSprite.drawTriangle(40, 90, 50, 85, 50, 95, GREEN);
+      pilotModeSprite.fillTriangle(40, 90, 50, 85, 50, 95, GREEN);
+      pilotModeSprite.drawTriangle(80, 90, 70, 85, 70, 95, GREEN);
+      pilotModeSprite.fillTriangle(80, 90, 70, 85, 70, 95, GREEN);
+
+      pilotModeSprite.pushSprite(0, 0);
+      }
+      break;
+
+    //--- МЕНЮ (OS3) ---
+    case OS3: {
+      // Замість окремої змінної isMenuActive — просто виклик drawMenu().
+      drawMenu();
+      }
+      break;
+
+    default:
+      break;
+  }
+}
+
+//-------------------------------------------------------------
+// ОБРОБКА КЛАВІАТУРИ (ЗАЛЕЖНО ВІД screen)
+//-------------------------------------------------------------
+
+// Логіка дій у меню (OS3)
+void handleMenuInput() {
+  if (!M5Cardputer.Keyboard.isChange()) return;
+  if (!M5Cardputer.Keyboard.isPressed()) return;
+
+  Keyboard_Class::KeysState state = M5Cardputer.Keyboard.keysState();
+  std::string pressedKey(state.word.begin(), state.word.end());
+
+  for (char x : state.word) {
+    // Вихід у OS0 — бектік
+    if (x == '`') {
+      // Повністю виходимо з меню
+      menuStack.clear();
+      screen = OS0;
+      return;
+    }
+    // Повернутись назад — ','
+    if (x == ',') {
+      if (!menuStack.empty()) {
+        MenuState st = menuStack.back();
+        menuStack.pop_back();
+
+        currentMenu     = st.menu;
+        currentMenuSize = st.menuSize;
+        selectedIndex   = st.selected;
+      } else {
+        // Якщо нема куди вертатись — виходимо на OS0
+        screen = OS0;
+      }
+      return;
+    }
+    // Вгору (;)
+    if (x == ';') {
+      selectedIndex--;
+      if (selectedIndex < 0) selectedIndex = currentMenuSize - 1;
+      drawMenu(); 
+      return;
+    }
+    // Вниз (.)
+    if (x == '.') {
+      selectedIndex++;
+      if (selectedIndex >= currentMenuSize) selectedIndex = 0;
+      drawMenu();
+      return;
+    }
+    // Вибір пункту (l, або Enter)
+    if (x == 'l' || state.enter) {
+      MenuItem& item = currentMenu[selectedIndex];
+      if (item.isAction) {
+        // Виконуємо дію
+        performAction(item.title);
+        // Лишаємося в цьому ж меню
+        drawMenu();
+      } else {
+        // Перехід у підменю
+        menuStack.push_back({currentMenu, currentMenuSize, selectedIndex});
+        currentMenu     = item.submenu;
+        currentMenuSize = item.submenuCount;
+        selectedIndex   = 0;
+
+        drawMenu();
+      }
+      return;
+    }
+  }
+}
+
+// Звичайна логіка (OS0, OS1, OS2) — handleNormalInput
+void handleNormalInput() {
+  if (!M5Cardputer.Keyboard.isChange()) return;
+  if (!M5Cardputer.Keyboard.isPressed()) return;
+
+  Keyboard_Class::KeysState state = M5Cardputer.Keyboard.keysState();
+  std::string pressedKey(state.word.begin(), state.word.end());
+
+  for (char x : state.word) {
+    switch (x) {
+      case '`': // вихід на OS0
         projectorPilotMode = false;
-        inputData          = "> "; // Завжди починаємо з "> "
-
-        screen = OS1;
-        return;  
-      }
-
-      // Комбінація OPT + P => Ввімкнення режиму «пілот проектору» (OS2)
-      if (state.opt && pressedKey == "p") {
         isInputMode        = false;
-        projectorPilotMode = true;
-
-        screen = OS2;
-        return;
-      }
-
-      // Натиснули Enter і перебуваємо у режимі введення
-      if (state.enter && isInputMode) {
-        isInputMode = false;
-        String savedText = inputData.substring(2);  
-        // Наприклад, розсилаємо по mesh:
-        mesh.sendBroadcast(savedText);
-
-        // Очищаємо інпут-спрайт
+        inputData          = "";
         inputSprite.fillSprite(BLACK);
         inputSprite.pushSprite(0, 135 - 28);
-      }
 
-      // Натиснули Enter у режимі projectorPilotMode => відправляємо IR (OK)
-      if (state.enter && projectorPilotMode) {
-        IrSender.sendNECRaw(0xF40BFC03, 0);
-        sendIRCommand();
-      }
+        screen = OS0;
+        return;
 
-      // Якщо ми не в режимі введення, скидаємо inputData (щоб порожнім було)
-      if (!isInputMode) {
-        inputData = "";
-      }
+      case 's':
+        if (state.opt) {
+          // OPT+s => Введення (OS1)
+          isInputMode        = true;
+          projectorPilotMode = false;
+          inputData          = "> ";
+
+          screen = OS1;
+          return;
+        }
+        inputData += x;
+        break;
+
+      case 'p':
+        if (state.opt) {
+          // OPT+p => Пілот (OS2)
+          isInputMode        = false;
+          projectorPilotMode = true;
+
+          screen = OS2;
+          return;
+        }
+        inputData += x;
+        break;
+
+      case ';': // Вверх
+        if (projectorPilotMode) {
+          IrSender.sendNECRaw(0xF609FC03, 0);
+          sendIRCommand();
+          return;
+        }
+        break;
+
+      case '.': // Вниз
+        if (projectorPilotMode) {
+          IrSender.sendNECRaw(0xFE01FC03, 0);
+          sendIRCommand();
+          return;
+        }
+        break;
+
+      case ',':
+        if (projectorPilotMode) {
+          IrSender.sendNECRaw(0xF708FC03, 0);
+          sendIRCommand();
+          return;
+        }
+        break;
+
+      case '/':
+        if (projectorPilotMode) {
+          IrSender.sendNECRaw(0xF50AFC03, 0);
+          sendIRCommand();
+          return;
+        }
+        break;
+
+      case ' ':
+        if (projectorPilotMode) {
+          IrSender.sendNECRaw(0xE01FFC03, 0);
+          sendIRCommand();
+          return;
+        }
+        break;
+
+      default:
+        // Усі інші символи
+        inputData += x;
+        break;
     }
+  }
+
+  // DEL
+  if (state.del && inputData.length() > 2) {
+    inputData.remove(inputData.length() - 1);
+  }
+
+  // Enter (якщо ми в OS1)
+  if (state.enter && isInputMode) {
+    isInputMode = false;
+    String savedText = inputData.substring(2);
+    mesh.sendBroadcast(savedText);
+
+    inputSprite.fillSprite(BLACK);
+    inputSprite.pushSprite(0, 135 - 28);
+  }
+  // Enter (якщо projectorPilotMode)
+  if (state.enter && projectorPilotMode) {
+    IrSender.sendNECRaw(0xF40BFC03, 0);
+    sendIRCommand();
+  }
+
+  // *** Виклик меню (OPT + M) => екран OS3
+  if (state.opt && pressedKey == "m") {
+    screen = OS3;
+    // Ініціалізуємо меню "з нуля"
+    currentMenu     = mainMenuItems;
+    currentMenuSize = mainMenuCount;
+    selectedIndex   = 0;
+    menuStack.clear();
+    return;
+  }
+
+  if (!isInputMode) {
+    inputData = "";
+  }
+}
+
+// handleInput() — дивимось, який screen
+void handleInput() {
+  if (screen == OS3) {
+    // Входимо в логіку меню
+    handleMenuInput();
+  } else {
+    // Стандартна логіка
+    handleNormalInput();
   }
 }
 
@@ -299,7 +453,7 @@ void setup() {
   indicatorSprite.createSprite(16, 16);
   inputSprite.createSprite(240, 28);
 
-  // Початковий екран (OS0)
+  // Початковий екран
   screen = OS0;
 }
 
@@ -307,15 +461,15 @@ void setup() {
 // LOOP
 //-------------------------------------------------------------
 void loop() {
-  // 1) Малюємо поточний екран
+  // Намалюємо поточний екран
   coreScreen();
 
-  // 2) Оновлюємо mesh
+  // Оновлення mesh
   mesh.update();
 
-  // 3) Оновлюємо M5Cardputer
+  // Оновлення M5Cardputer
   M5Cardputer.update();
 
-  // 4) Обробляємо натискання клавіш
+  // Обробка клавіш
   handleInput();
 }
