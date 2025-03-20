@@ -118,7 +118,7 @@ void drawMenu() {
   mainScreenSprite.setTextDatum(textdatum_t::top_left);
 
   // Заголовок
-  mainScreenSprite.drawString("Menu (`,':exit/back)", 10, 5);
+  mainScreenSprite.drawString("Menu", 10, 5);
 
   int startY = 30;
   for (int i = 0; i < currentMenuSize; i++) {
@@ -282,8 +282,8 @@ void handleMenuInput() {
       drawMenu();
       return;
     }
-    // Вибір пункту (l, або Enter)
-    if (x == 'l' || state.enter) {
+    // Вибір пункту (вліво)
+    if (x == '/') {
       MenuItem& item = currentMenu[selectedIndex];
       if (item.isAction) {
         // Виконуємо дію
