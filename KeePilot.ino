@@ -34,18 +34,44 @@ enum CORESCREEN {
 //=============================================================
 //                МЕНЮ: СТРУКТУРА ТА ЛОГІКА
 //=============================================================
-struct MenuItem {
-  const char* title;    // Назва в меню
-  bool isAction;        // якщо true => виконуємо дію
-  MenuItem* submenu;    // підменю
-  int submenuCount;
+enum ActionID {
+  ACTION_NONE = 0,
+  ACTION_BEDSIDE,
+  ACTION_LAMP_OFF,
 };
 
-// Підменю (приклад) — лампа
-MenuItem lampSubmenu[] = {
-  {"Turn ON",      true, nullptr, 0},
-  {"Turn OFF",     true, nullptr, 0},
-  {"Brightness",   true, nullptr, 0},
+// Тепер кожен MenuItem має ще й ідентифікатор дії
+struct MenuItem {
+  const char* title;    // Назва, як раніше
+  bool isAction;
+  MenuItem* submenu;
+  int submenuCount;
+  ActionID actionID;    // поле з enum
+};
+
+void performAction(ActionID id) {
+  switch (id) {
+    case ACTION_BEDSIDE:
+      mesh.sendSingle(635035530,"bedside");
+      break;
+
+    default:
+      // Для будь-яких інших дій
+      break;
+  }
+}
+
+void onMenuItemSelected(MenuItem &item) {
+  // Якщо це дія — викликаємо performAction()
+  if (item.isAction) {
+    performAction(item.actionID);
+  } else {
+    // Йдемо в підменю (як раніше)
+  }
+}
+
+MenuItem bedsideSubmenu[] = {
+  {"ON/OFF",      true, nullptr, 0, ACTION_BEDSIDE},
 };
 // Підменю — обігрівач
 MenuItem heaterSubmenu[] = {
@@ -61,7 +87,7 @@ MenuItem cameraSubmenu[] = {
 
 // Головне меню
 MenuItem mainMenuItems[] = {
-  {"Lamp",   false, lampSubmenu,   3},
+  {"bedside",   false, bedsideSubmenu,   1},
   {"Heater", false, heaterSubmenu, 3},
   {"Camera", false, cameraSubmenu, 2},
 };
@@ -79,14 +105,6 @@ struct MenuState {
   int selected;
 };
 std::vector<MenuState> menuStack;
-
-//-------------------------------------------------------------
-// Виконує дію пункту меню
-//-------------------------------------------------------------
-void performAction(const char* title) {
-  // Тут можеш викликати логіку smart home, IR, mesh тощо
-  mesh.sendBroadcast(String("Action: ") + title);
-}
 
 //-------------------------------------------------------------
 // Малюємо меню (стан OS3) на mainScreenSprite
@@ -269,7 +287,7 @@ void handleMenuInput() {
       MenuItem& item = currentMenu[selectedIndex];
       if (item.isAction) {
         // Виконуємо дію
-        performAction(item.title);
+        performAction(item.actionID);
         // Лишаємося в цьому ж меню
         drawMenu();
       } else {
