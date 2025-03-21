@@ -37,7 +37,7 @@ enum CORESCREEN {
 enum ActionID {
   ACTION_NONE = 0,
   ACTION_BEDSIDE,
-  ACTION_LAMP_OFF,
+  ACTION_LAMPK,
 };
 
 // Тепер кожен MenuItem має ще й ідентифікатор дії
@@ -53,6 +53,10 @@ void performAction(ActionID id) {
   switch (id) {
     case ACTION_BEDSIDE:
       mesh.sendSingle(635035530,"bedside");
+      break;
+
+    case ACTION_LAMPK:
+      mesh.sendSingle(434115122,"lam");
       break;
 
     default:
@@ -74,10 +78,8 @@ MenuItem bedsideSubmenu[] = {
   {"ON/OFF",      true, nullptr, 0, ACTION_BEDSIDE},
 };
 // Підменю — обігрівач
-MenuItem heaterSubmenu[] = {
-  {"Turn ON",      true, nullptr, 0},
-  {"Turn OFF",     true, nullptr, 0},
-  {"Temp",         true, nullptr, 0},
+MenuItem lampkSubmenu[] = {
+  {"ON/OFF",      true, nullptr, 0},
 };
 // Підменю — камера
 MenuItem cameraSubmenu[] = {
@@ -88,7 +90,7 @@ MenuItem cameraSubmenu[] = {
 // Головне меню
 MenuItem mainMenuItems[] = {
   {"bedside",   false, bedsideSubmenu,   1},
-  {"Heater", false, heaterSubmenu, 3},
+  {"lampk", false, lampkSubmenu, 1},
   {"Camera", false, cameraSubmenu, 2},
 };
 int mainMenuCount = 3;
