@@ -38,6 +38,7 @@ enum ActionID {
   ACTION_NONE = 0,
   ACTION_BEDSIDE,
   ACTION_LAMPK,
+  ACTION_GARLAND,
 };
 
 // Тепер кожен MenuItem має ще й ідентифікатор дії
@@ -57,6 +58,10 @@ void performAction(ActionID id) {
 
     case ACTION_LAMPK:
       mesh.sendSingle(434115122,"lam");
+      break;
+
+    case ACTION_GARLAND:
+      mesh.sendSingle(2224853816,"garland");
       break;
 
     default:
@@ -79,19 +84,18 @@ MenuItem bedsideSubmenu[] = {
 };
 // Підменю — обігрівач
 MenuItem lampkSubmenu[] = {
-  {"ON/OFF",      true, nullptr, 0},
+  {"ON/OFF",      true, nullptr, 0, ACTION_LAMPK},
 };
 // Підменю — камера
-MenuItem cameraSubmenu[] = {
-  {"Take Photo",   true, nullptr, 0},
-  {"Stream Video", true, nullptr, 0},
+MenuItem garlandSubmenu[] = {
+  {"ON/OFF",   true, nullptr, 0, ACTION_GARLAND},
 };
 
 // Головне меню
 MenuItem mainMenuItems[] = {
   {"bedside",   false, bedsideSubmenu,   1},
   {"lampk", false, lampkSubmenu, 1},
-  {"Camera", false, cameraSubmenu, 2},
+  {"garland", false, garlandSubmenu, 1},
 };
 int mainMenuCount = 3;
 
@@ -162,7 +166,7 @@ void coreScreen() {
       mainScreenSprite.fillScreen(BLACK);
 
       int voltageMilliVolt = M5Cardputer.Power.getBatteryVoltage();
-      float voltage        = voltageMilliVolt / 100.0;  // 407 -> 4.07
+      float voltage        = voltageMilliVolt / 1000.0;
 
       char voltageText[10];
       sprintf(voltageText, "%.2fV", voltage);
@@ -477,9 +481,7 @@ void setup() {
   screen = OS0;
 }
 
-//-------------------------------------------------------------
-// LOOP
-//-------------------------------------------------------------
+
 void loop() {
   // Намалюємо поточний екран
   coreScreen();
