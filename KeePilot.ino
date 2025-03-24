@@ -240,78 +240,9 @@ void coreScreen() {
 }
 
 //-------------------------------------------------------------
-// ОБРОБКА КЛАВІАТУРИ (ЗАЛЕЖНО ВІД screen)
+// ОБРОБКА КЛАВІАТУРИ 
 //-------------------------------------------------------------
-
-// Логіка дій у меню (OS3)
-void handleMenuInput() {
-  if (!M5Cardputer.Keyboard.isChange()) return;
-  if (!M5Cardputer.Keyboard.isPressed()) return;
-
-  Keyboard_Class::KeysState state = M5Cardputer.Keyboard.keysState();
-  std::string pressedKey(state.word.begin(), state.word.end());
-
-  for (char x : state.word) {
-    // Вихід у OS0 — бектік
-    if (x == '`') {
-      // Повністю виходимо з меню
-      menuStack.clear();
-      screen = OS0;
-      return;
-    }
-    // Повернутись назад — ','
-    if (x == ',') {
-      if (!menuStack.empty()) {
-        MenuState st = menuStack.back();
-        menuStack.pop_back();
-
-        currentMenu     = st.menu;
-        currentMenuSize = st.menuSize;
-        selectedIndex   = st.selected;
-      } else {
-        // Якщо нема куди вертатись — виходимо на OS0
-        screen = OS0;
-      }
-      return;
-    }
-    // Вгору (;)
-    if (x == ';') {
-      selectedIndex--;
-      if (selectedIndex < 0) selectedIndex = currentMenuSize - 1;
-      drawMenu(); 
-      return;
-    }
-    // Вниз (.)
-    if (x == '.') {
-      selectedIndex++;
-      if (selectedIndex >= currentMenuSize) selectedIndex = 0;
-      drawMenu();
-      return;
-    }
-    // Вибір пункту (вліво)
-    if (x == '/') {
-      MenuItem& item = currentMenu[selectedIndex];
-      if (item.isAction) {
-        // Виконуємо дію
-        performAction(item.actionID);
-        // Лишаємося в цьому ж меню
-        drawMenu();
-      } else {
-        // Перехід у підменю
-        menuStack.push_back({currentMenu, currentMenuSize, selectedIndex});
-        currentMenu     = item.submenu;
-        currentMenuSize = item.submenuCount;
-        selectedIndex   = 0;
-
-        drawMenu();
-      }
-      return;
-    }
-  }
-}
-
-// Звичайна логіка (OS0, OS1, OS2) — handleNormalInput
-void handleNormalInput() {
+void handleInput() {
   if (!M5Cardputer.Keyboard.isChange()) return;
   if (!M5Cardputer.Keyboard.isPressed()) return;
 
@@ -324,6 +255,7 @@ void handleNormalInput() {
         projectorPilotMode = false;
         isInputMode        = false;
         inputData          = "";
+        menuStack.clear();
         inputSprite.fillSprite(BLACK);
         inputSprite.pushSprite(0, 135 - 28);
 
@@ -356,6 +288,14 @@ void handleNormalInput() {
         break;
 
       case ';': // Вверх
+
+        if (screen == OS3) {
+          selectedIndex--;
+          if (selectedIndex < 0) selectedIndex = currentMenuSize - 1;
+          drawMenu(); 
+          return;
+        }
+
         if (projectorPilotMode) {
           IrSender.sendNECRaw(0xF609FC03, 0);
           sendIRCommand();
@@ -364,6 +304,14 @@ void handleNormalInput() {
         break;
 
       case '.': // Вниз
+
+        if (x == '.') {
+          selectedIndex++;
+          if (selectedIndex >= currentMenuSize) selectedIndex = 0;
+          drawMenu();
+          return;
+        }
+
         if (projectorPilotMode) {
           IrSender.sendNECRaw(0xFE01FC03, 0);
           sendIRCommand();
@@ -371,15 +319,46 @@ void handleNormalInput() {
         }
         break;
 
-      case ',':
+      case ',': // вліво
         if (projectorPilotMode) {
           IrSender.sendNECRaw(0xF708FC03, 0);
           sendIRCommand();
           return;
         }
+
+        if (screen == OS3) {
+          if (!menuStack.empty()) {
+            MenuState st = menuStack.back();
+            menuStack.pop_back();
+
+            currentMenu     = st.menu;
+            currentMenuSize = st.menuSize;
+            selectedIndex   = st.selected;
+          } else {
+            screen = OS0;
+          }
+        }
         break;
 
       case '/':
+        if (screen == OS3) {
+          MenuItem& item = currentMenu[selectedIndex];
+        if (item.isAction) {
+          // Виконуємо дію
+          performAction(item.actionID);
+        // Лишаємося в цьому ж меню
+          drawMenu();
+        } else {
+          // Перехід у підменю
+          menuStack.push_back({currentMenu, currentMenuSize, selectedIndex});
+          currentMenu     = item.submenu;
+          currentMenuSize = item.submenuCount;
+          selectedIndex   = 0;
+
+          drawMenu();
+        }
+        return;
+      }
         if (projectorPilotMode) {
           IrSender.sendNECRaw(0xF50AFC03, 0);
           sendIRCommand();
@@ -438,19 +417,6 @@ void handleNormalInput() {
   }
 }
 
-// handleInput() — дивимось, який screen
-void handleInput() {
-  if (screen == OS3) {
-    // Входимо в логіку меню
-    handleMenuInput();
-  } else {
-    // Стандартна логіка
-    handleNormalInput();
-  }
-}
-
-//-------------------------------------------------------------
-// SETUP
 //-------------------------------------------------------------
 void setup() {
   // Ініціалізація mesh
@@ -480,7 +446,6 @@ void setup() {
   // Початковий екран
   screen = OS0;
 }
-
 
 void loop() {
   // Намалюємо поточний екран
