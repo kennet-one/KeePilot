@@ -284,6 +284,13 @@ void handleInput() {
           screen = OS2;
           return;
         }
+
+        if (projectorPilotMode) { 
+          IrSender.sendNECRaw(0xE21DFC03, 0);
+          sendIRCommand();
+          break;
+        }
+        
         inputData += x;
         break;
 
@@ -448,15 +455,11 @@ void setup() {
 }
 
 void loop() {
-  // Намалюємо поточний екран
   coreScreen();
 
-  // Оновлення mesh
   mesh.update();
 
-  // Оновлення M5Cardputer
   M5Cardputer.update();
 
-  // Обробка клавіш
   handleInput();
 }
