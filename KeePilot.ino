@@ -312,7 +312,7 @@ void handleInput() {
 
       case '.': // Вниз
 
-        if (x == '.') {
+        if (screen == OS3) {
           selectedIndex++;
           if (selectedIndex >= currentMenuSize) selectedIndex = 0;
           drawMenu();
