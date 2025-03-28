@@ -113,37 +113,6 @@ struct MenuState {
 std::vector<MenuState> menuStack;
 
 //-------------------------------------------------------------
-// Малюємо меню (стан OS3) на mainScreenSprite
-//-------------------------------------------------------------
-void drawMenu() {
-  mainScreenSprite.fillScreen(BLACK);
-
-  mainScreenSprite.setFont(&fonts::Font4);
-  mainScreenSprite.setTextSize(1);
-  mainScreenSprite.setTextColor(GREEN);
-  mainScreenSprite.setTextDatum(textdatum_t::top_left);
-
-  // Заголовок
-  mainScreenSprite.drawString("Menu", 10, 0);
-  mainScreenSprite.setTextColor(WHITE);
-  mainScreenSprite.drawFastHLine(0, 20, mainScreenSprite.width(), RED);
-
-  int startY = 30;
-  for (int i = 0; i < currentMenuSize; i++) {
-    int y = startY + i * 20;
-    if (i == selectedIndex) {
-      // Виділяємо пункт
-      mainScreenSprite.fillRect(0, y, mainScreenSprite.width(), 20, BLUE);
-      mainScreenSprite.setTextColor(BLACK);
-    } else {
-      mainScreenSprite.setTextColor(WHITE);
-    }
-    mainScreenSprite.drawString(currentMenu[i].title, 10, y);
-  }
-  mainScreenSprite.pushSprite(0, 0);
-}
-
-//-------------------------------------------------------------
 // Анімація індикатора передавання IR
 //-------------------------------------------------------------
 void sendIRCommand() {
@@ -231,8 +200,31 @@ void coreScreen() {
 
     //--- МЕНЮ (OS3) ---
     case OS3: {
-      // Замість окремої змінної isMenuActive — просто виклик drawMenu().
-      drawMenu();
+
+      mainScreenSprite.fillScreen(BLACK);
+
+      mainScreenSprite.setFont(&fonts::Font4);
+      mainScreenSprite.setTextSize(1);
+      mainScreenSprite.setTextColor(GREEN);
+      mainScreenSprite.setTextDatum(textdatum_t::top_left);
+
+      mainScreenSprite.drawString("Menu", 10, 0);
+      mainScreenSprite.setTextColor(WHITE);
+      mainScreenSprite.drawFastHLine(0, 20, mainScreenSprite.width(), RED);
+
+      int startY = 30;
+      for (int i = 0; i < currentMenuSize; i++) {
+        int y = startY + i * 20;
+        if (i == selectedIndex) {
+          // Виділяємо пункт
+          mainScreenSprite.fillRect(0, y, mainScreenSprite.width(), 20, BLUE);
+          mainScreenSprite.setTextColor(BLACK);
+        } else {
+          mainScreenSprite.setTextColor(WHITE);
+        }
+        mainScreenSprite.drawString(currentMenu[i].title, 10, y);
+      }
+      mainScreenSprite.pushSprite(0, 0);
       }
       break;
 
@@ -301,7 +293,7 @@ void handleInput() {
         if (screen == OS3) {
           selectedIndex--;
           if (selectedIndex < 0) selectedIndex = currentMenuSize - 1;
-          drawMenu(); 
+          //drawMenu(); 
           return;
         }
 
@@ -317,7 +309,7 @@ void handleInput() {
         if (screen == OS3) {
           selectedIndex++;
           if (selectedIndex >= currentMenuSize) selectedIndex = 0;
-          drawMenu();
+          //drawMenu();
           return;
         }
 
@@ -356,7 +348,7 @@ void handleInput() {
           // Виконуємо дію
           performAction(item.actionID);
         // Лишаємося в цьому ж меню
-          drawMenu();
+          //drawMenu();
         } else {
           // Перехід у підменю
           menuStack.push_back({currentMenu, currentMenuSize, selectedIndex});
@@ -364,7 +356,7 @@ void handleInput() {
           currentMenuSize = item.submenuCount;
           selectedIndex   = 0;
 
-          drawMenu();
+          //drawMenu();
         }
         return;
       }
