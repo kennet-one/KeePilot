@@ -120,11 +120,13 @@ void drawMenu() {
 
   mainScreenSprite.setFont(&fonts::Font4);
   mainScreenSprite.setTextSize(1);
-  mainScreenSprite.setTextColor(WHITE);
+  mainScreenSprite.setTextColor(GREEN);
   mainScreenSprite.setTextDatum(textdatum_t::top_left);
 
   // Заголовок
-  mainScreenSprite.drawString("Menu", 10, 5);
+  mainScreenSprite.drawString("Menu", 10, 0);
+  mainScreenSprite.setTextColor(WHITE);
+  mainScreenSprite.drawFastHLine(0, 20, mainScreenSprite.width(), RED);
 
   int startY = 30;
   for (int i = 0; i < currentMenuSize; i++) {
