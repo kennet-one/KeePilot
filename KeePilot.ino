@@ -115,15 +115,15 @@ std::vector<MenuState> menuStack;
 //-------------------------------------------------------------
 // Анімація індикатора передавання IR
 //-------------------------------------------------------------
-void sendIRCommand() {
+void sendIRCommand(int x,int y) {
   indicatorSprite.fillScreen(BLACK);
   indicatorSprite.fillCircle(8, 8, 7, GREEN);
-  indicatorSprite.pushSprite(32, 105);
+  indicatorSprite.pushSprite(x, y);
   delay(500);
 
   indicatorSprite.fillScreen(BLACK);
   indicatorSprite.fillCircle(8, 8, 7, YELLOW);
-  indicatorSprite.pushSprite(32, 105);
+  indicatorSprite.pushSprite(x, y);
   delay(500);
 }
 
@@ -281,7 +281,7 @@ void handleInput() {
 
         if (projectorPilotMode) { 
           IrSender.sendNECRaw(0xE21DFC03, 0);
-          sendIRCommand();
+          sendIRCommand(32, 105);
           break;
         }
         
@@ -299,7 +299,7 @@ void handleInput() {
 
         if (projectorPilotMode) {
           IrSender.sendNECRaw(0xF609FC03, 0);
-          sendIRCommand();
+          sendIRCommand(32, 105);
           return;
         }
         break;
@@ -315,7 +315,7 @@ void handleInput() {
 
         if (projectorPilotMode) {
           IrSender.sendNECRaw(0xFE01FC03, 0);
-          sendIRCommand();
+          sendIRCommand(32, 105);
           return;
         }
         break;
@@ -323,7 +323,7 @@ void handleInput() {
       case ',': // вліво
         if (projectorPilotMode) {
           IrSender.sendNECRaw(0xF708FC03, 0);
-          sendIRCommand();
+          sendIRCommand(32, 105);
           return;
         }
 
@@ -347,22 +347,20 @@ void handleInput() {
         if (item.isAction) {
           // Виконуємо дію
           performAction(item.actionID);
+          sendIRCommand(220, 0);
         // Лишаємося в цьому ж меню
-          //drawMenu();
         } else {
           // Перехід у підменю
           menuStack.push_back({currentMenu, currentMenuSize, selectedIndex});
           currentMenu     = item.submenu;
           currentMenuSize = item.submenuCount;
           selectedIndex   = 0;
-
-          //drawMenu();
         }
         return;
       }
         if (projectorPilotMode) {
           IrSender.sendNECRaw(0xF50AFC03, 0);
-          sendIRCommand();
+          sendIRCommand(32, 105);
           return;
         }
         break;
@@ -370,7 +368,7 @@ void handleInput() {
       case ' ':
         if (projectorPilotMode) {
           IrSender.sendNECRaw(0xE01FFC03, 0);
-          sendIRCommand();
+          sendIRCommand(32, 105);
           return;
         }
         break;
@@ -399,7 +397,7 @@ void handleInput() {
   // Enter (якщо projectorPilotMode)
   if (state.enter && projectorPilotMode) {
     IrSender.sendNECRaw(0xF40BFC03, 0);
-    sendIRCommand();
+    sendIRCommand(32, 105);
   }
 
   // *** Виклик меню (OPT + M) => екран OS3
