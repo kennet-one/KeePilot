@@ -156,6 +156,9 @@ void coreScreen() {
 
     //--- ЕКРАН ВВЕДЕННЯ ТЕКСТУ (OS1) ---
     case OS1: {
+      inputSprite.fillScreen(BLACK);
+      inputSprite.pushSprite(0, 0);
+
       inputSprite.fillSprite(0x404040);
       inputSprite.setFont(&fonts::Font4);
       inputSprite.setTextSize(1);
