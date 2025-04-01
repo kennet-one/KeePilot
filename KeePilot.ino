@@ -34,6 +34,8 @@ enum CORESCREEN {
 //=============================================================
 //                МЕНЮ: СТРУКТУРА ТА ЛОГІКА
 //=============================================================
+
+
 enum ActionID {
   ACTION_NONE = 0,
   ACTION_BEDSIDE,
@@ -43,11 +45,17 @@ enum ActionID {
 
 // Тепер кожен MenuItem має ще й ідентифікатор дії
 struct MenuItem {
-  const char* title;    // Назва, як раніше
+  const char* title;    
   bool isAction;
   MenuItem* submenu;
   int submenuCount;
   ActionID actionID;    // поле з enum
+  uint32_t nodeId; // Додали ID ноди для перевірки online-статусу
+};
+
+bool isNodeOnline(uint32_t nodeId) {
+  auto nodes = mesh.getNodeList();
+  return std::find(nodes.begin(), nodes.end(), nodeId) != nodes.end();
 };
 
 void performAction(ActionID id) {
@@ -82,21 +90,22 @@ void onMenuItemSelected(MenuItem &item) {
 MenuItem bedsideSubmenu[] = {
   {"ON/OFF",      true, nullptr, 0, ACTION_BEDSIDE},
 };
-// Підменю — обігрівач
+
 MenuItem lampkSubmenu[] = {
   {"ON/OFF",      true, nullptr, 0, ACTION_LAMPK},
 };
-// Підменю — камера
+
 MenuItem garlandSubmenu[] = {
   {"ON/OFF",   true, nullptr, 0, ACTION_GARLAND},
 };
 
 // Головне меню
 MenuItem mainMenuItems[] = {
-  {"bedside",   false, bedsideSubmenu,   1},
-  {"lampk", false, lampkSubmenu, 1},
-  {"garland", false, garlandSubmenu, 1},
+  {"bedside", false, bedsideSubmenu, 1, ACTION_NONE, 635035530},
+  {"lampk",   false, lampkSubmenu,   1, ACTION_NONE, 434115122},
+  {"garland", false, garlandSubmenu, 1, ACTION_NONE, 2224853816},
 };
+
 int mainMenuCount = 3;
 
 // «Поточне» меню, по якому ми ходимо
@@ -113,7 +122,7 @@ struct MenuState {
 std::vector<MenuState> menuStack;
 
 //-------------------------------------------------------------
-// Анімація індикатора передавання IR
+// Анімація індикатора передавання
 //-------------------------------------------------------------
 void sendIRCommand(int x,int y) {
   indicatorSprite.fillScreen(BLACK);
@@ -218,14 +227,20 @@ void coreScreen() {
       int startY = 30;
       for (int i = 0; i < currentMenuSize; i++) {
         int y = startY + i * 20;
+
+        bool online = isNodeOnline(currentMenu[i].nodeId);
+
         if (i == selectedIndex) {
           // Виділяємо пункт
           mainScreenSprite.fillRect(0, y, mainScreenSprite.width(), 20, BLUE);
           mainScreenSprite.setTextColor(BLACK);
         } else {
-          mainScreenSprite.setTextColor(WHITE);
+          mainScreenSprite.setTextColor(online ? WHITE : DARKGREY);
         }
-        mainScreenSprite.drawString(currentMenu[i].title, 10, y);
+        String itemText = String(currentMenu[i].title);
+        itemText += online ? " [online]" : " [offline]";
+
+        mainScreenSprite.drawString(itemText, 10, y);
       }
       mainScreenSprite.pushSprite(0, 0);
       }
