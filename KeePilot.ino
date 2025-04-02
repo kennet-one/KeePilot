@@ -238,7 +238,12 @@ void coreScreen() {
           mainScreenSprite.setTextColor(online ? WHITE : DARKGREY);
         }
         String itemText = String(currentMenu[i].title);
-        itemText += online ? " [online]" : " [offline]";
+
+        if (!currentMenu[i].isAction) { // якшо не головне меню то убрати надпис
+          bool online = isNodeOnline(currentMenu[i].nodeId);
+          itemText += online ? " [online]" : " [offline]";
+        }
+        
 
         mainScreenSprite.drawString(itemText, 10, y);
       }
