@@ -35,7 +35,6 @@ enum CORESCREEN {
 //                МЕНЮ: СТРУКТУРА ТА ЛОГІКА
 //=============================================================
 
-
 enum ActionID {
   ACTION_NONE = 0,
   ACTION_BEDSIDE,
@@ -82,8 +81,6 @@ void onMenuItemSelected(MenuItem &item) {
   // Якщо це дія — викликаємо performAction()
   if (item.isAction) {
     performAction(item.actionID);
-  } else {
-    // Йдемо в підменю (як раніше)
   }
 }
 
@@ -279,9 +276,8 @@ void handleInput() {
         screen = OS0;
         return;
 
-      case 's':
+      case 's':// OPT+s => Введення (OS1)
         if (state.opt) {
-          // OPT+s => Введення (OS1)
           isInputMode        = true;
           projectorPilotMode = false;
           inputData          = "> ";
@@ -289,37 +285,51 @@ void handleInput() {
           screen = OS1;
           return;
         }
-        inputData += x;
+        if (isInputMode) {
+          inputData += x;
+        }
         break;
 
-      case 'p':
+      case 'p':// OPT+p => Пілот (OS2)
         if (state.opt) {
-          // OPT+p => Пілот (OS2)
           isInputMode        = false;
           projectorPilotMode = true;
 
           screen = OS2;
           return;
         }
-
         if (projectorPilotMode) { 
           IrSender.sendNECRaw(0xE21DFC03, 0);
           sendIRCommand(32, 105);
           break;
         }
-        
-        inputData += x;
+        if (isInputMode) {
+          inputData += x;
+        }
+        break;
+
+      case 'm':// Виклик меню екран OS3
+        if (state.opt) {
+          screen = OS3;
+
+          currentMenu     = mainMenuItems;
+          currentMenuSize = mainMenuCount;
+          selectedIndex   = 0;
+          menuStack.clear();
+          break;
+        }
+        if (isInputMode) {
+          inputData += x;
+        }
         break;
 
       case ';': // Вверх
-
         if (screen == OS3) {
           selectedIndex--;
           if (selectedIndex < 0) selectedIndex = currentMenuSize - 1;
-          //drawMenu(); 
+
           return;
         }
-
         if (projectorPilotMode) {
           IrSender.sendNECRaw(0xF609FC03, 0);
           sendIRCommand(32, 105);
@@ -328,14 +338,12 @@ void handleInput() {
         break;
 
       case '.': // Вниз
-
         if (screen == OS3) {
           selectedIndex++;
           if (selectedIndex >= currentMenuSize) selectedIndex = 0;
-          //drawMenu();
+
           return;
         }
-
         if (projectorPilotMode) {
           IrSender.sendNECRaw(0xFE01FC03, 0);
           sendIRCommand(32, 105);
@@ -349,7 +357,6 @@ void handleInput() {
           sendIRCommand(32, 105);
           return;
         }
-
         if (screen == OS3) {
           if (!menuStack.empty()) {
             MenuState st = menuStack.back();
@@ -364,16 +371,14 @@ void handleInput() {
         }
         break;
 
-      case '/':
+      case '/': // вправо
         if (screen == OS3) {
           MenuItem& item = currentMenu[selectedIndex];
-        if (item.isAction) {
-          // Виконуємо дію
+        if (item.isAction) {// Виконуємо дію
           performAction(item.actionID);
           sendIRCommand(220, 0);
         // Лишаємося в цьому ж меню
-        } else {
-          // Перехід у підменю
+        } else {// Перехід у підменю
           menuStack.push_back({currentMenu, currentMenuSize, selectedIndex});
           currentMenu     = item.submenu;
           currentMenuSize = item.submenuCount;
@@ -396,20 +401,19 @@ void handleInput() {
         }
         break;
 
-      default:
-        // Усі інші символи
-        inputData += x;
+      default:// Усі інші символи
+        if (isInputMode) {
+          inputData += x;
+        }
         break;
     }
   }
 
-  // DEL
-  if (state.del && inputData.length() > 2) {
+  if ((state.del && inputData.length() > 2) && ( isInputMode )) {// DEL
     inputData.remove(inputData.length() - 1);
   }
 
-  // Enter (якщо ми в OS1)
-  if (state.enter && isInputMode) {
+  if (state.enter && isInputMode) {// Enter (якщо ми в OS1)
     isInputMode = false;
     String savedText = inputData.substring(2);
     mesh.sendBroadcast(savedText);
@@ -417,21 +421,10 @@ void handleInput() {
     inputSprite.fillSprite(BLACK);
     inputSprite.pushSprite(0, 135 - 28);
   }
-  // Enter (якщо projectorPilotMode)
-  if (state.enter && projectorPilotMode) {
+  
+  if (state.enter && projectorPilotMode) {// Enter (якщо projectorPilotMode)
     IrSender.sendNECRaw(0xF40BFC03, 0);
     sendIRCommand(32, 105);
-  }
-
-  // *** Виклик меню (OPT + M) => екран OS3
-  if (state.opt && pressedKey == "m") {
-    screen = OS3;
-    // Ініціалізуємо меню "з нуля"
-    currentMenu     = mainMenuItems;
-    currentMenuSize = mainMenuCount;
-    selectedIndex   = 0;
-    menuStack.clear();
-    return;
   }
 
   if (!isInputMode) {
@@ -441,11 +434,9 @@ void handleInput() {
 
 //-------------------------------------------------------------
 void setup() {
-  // Ініціалізація mesh
-  mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
+  mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);// Ініціалізація mesh
 
-  // Ініціалізація M5Cardputer
-  auto cfg = M5.config();
+  auto cfg = M5.config();// Ініціалізація M5Cardputer
   M5Cardputer.begin(cfg, true);
   M5Cardputer.Display.setRotation(1);
   M5Cardputer.Display.setTextColor(GREEN);
@@ -453,20 +444,18 @@ void setup() {
   M5Cardputer.Display.setFont(&fonts::Orbitron_Light_24);
   M5Cardputer.Display.setTextSize(1);
 
-  // Ініціалізація IR
-  IrSender.begin(DISABLE_LED_FEEDBACK);
+  IrSender.begin(DISABLE_LED_FEEDBACK);// Ініціалізація IR
   IrSender.setSendPin(IR_TX_PIN);
 
-  // Створення спрайтів (один раз)
-  int w = M5Cardputer.Display.width();
-  int h = M5Cardputer.Display.height();
-  mainScreenSprite.createSprite(w, h);
-  pilotModeSprite.createSprite(w, h);
-  indicatorSprite.createSprite(16, 16);
-  inputSprite.createSprite(240, 28);
 
-  // Початковий екран
-  screen = OS0;
+  int w = M5Cardputer.Display.width();  // Створення спрайтів
+  int h = M5Cardputer.Display.height(); //
+  mainScreenSprite.createSprite(w, h);  //
+  pilotModeSprite.createSprite(w, h);   //
+  indicatorSprite.createSprite(16, 16); //
+  inputSprite.createSprite(240, 28);    //
+
+  screen = OS0;// Початковий екран
 }
 
 void loop() {
