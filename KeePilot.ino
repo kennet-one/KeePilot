@@ -234,15 +234,19 @@ void coreScreen() {
         } else {
           mainScreenSprite.setTextColor(online ? WHITE : DARKGREY);
         }
-        String itemText = String(currentMenu[i].title);
+        mainScreenSprite.setTextSize(1);
+        String titleText = String(currentMenu[i].title);
+        mainScreenSprite.drawString(titleText, 10, y);
+
+        int16_t mainTextWidth = mainScreenSprite.textWidth(titleText);
 
         if (!currentMenu[i].isAction) { // якшо не головне меню то убрати надпис
-          bool online = isNodeOnline(currentMenu[i].nodeId);
-          itemText += online ? " [online]" : " [offline]";
-        }
-        
+          mainScreenSprite.setTextSize(0.5);
 
-        mainScreenSprite.drawString(itemText, 10, y);
+          String statusPart = online ? " [online]" : " [offline]";
+          mainScreenSprite.drawString(statusPart, 20 + mainTextWidth, y + 5);
+          mainScreenSprite.setTextSize(1);
+        }
       }
       mainScreenSprite.pushSprite(0, 0);
       }
