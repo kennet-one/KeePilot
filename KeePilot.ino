@@ -217,8 +217,19 @@ void coreScreen() {
       mainScreenSprite.setTextColor(GREEN);
       mainScreenSprite.setTextDatum(textdatum_t::top_left);
 
-      mainScreenSprite.drawString("Menu", 10, 0);
-      mainScreenSprite.setTextColor(WHITE);
+      String menuTitle = "Menu";
+      
+      if (!menuStack.empty()) {// Якщо стек не порожній, значить ми в підменю
+        MenuState &parentState = menuStack.back();
+        MenuItem  &parentItem  = parentState.menu[parentState.selected];
+        
+        menuTitle += " -> ";
+        menuTitle += parentItem.title;
+      }
+
+      mainScreenSprite.drawString(menuTitle, 10, 0);// Малюємо зібраний заголовок
+
+      mainScreenSprite.setTextColor(WHITE);// Далі малюємо риску, а потім - пункти меню:
       mainScreenSprite.drawFastHLine(0, 20, mainScreenSprite.width(), RED);
 
       int startY = 30;
