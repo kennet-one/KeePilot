@@ -22,6 +22,10 @@ LGFX_Sprite pilotModeSprite(&M5Cardputer.Display);
 LGFX_Sprite indicatorSprite(&M5Cardputer.Display);
 LGFX_Sprite inputSprite(&M5Cardputer.Display);
 
+//------------------------ ПОЛЕ ФІДБЕКА ------------------
+// -1 = невідомо, 0 = вимкнена, 1 = увімкнена
+int garlandState = -1;  
+
 //------------------------ ЕКРАНИ (ENUM) ----------------------
 enum CORESCREEN {
   OS0,   // Головний екран (вольтаж)
@@ -42,14 +46,13 @@ enum ActionID {
   ACTION_GARLAND,
 };
 
-// Тепер кожен MenuItem має ще й ідентифікатор дії
 struct MenuItem {
   const char* title;    
   bool isAction;
   MenuItem* submenu;
   int submenuCount;
-  ActionID actionID;    // поле з enum
-  uint32_t nodeId; // Додали ID ноди для перевірки online-статусу
+  ActionID actionID;    
+  uint32_t nodeId; // ID ноди для перевірки online-статусу
 };
 
 bool isNodeOnline(uint32_t nodeId) {
@@ -72,18 +75,17 @@ void performAction(ActionID id) {
       break;
 
     default:
-      // Для будь-яких інших дій
       break;
   }
 }
 
 void onMenuItemSelected(MenuItem &item) {
-  // Якщо це дія — викликаємо performAction()
   if (item.isAction) {
     performAction(item.actionID);
   }
 }
 
+// Підменю
 MenuItem bedsideSubmenu[] = {
   {"ON/OFF",      true, nullptr, 0, ACTION_BEDSIDE},
 };
@@ -93,6 +95,7 @@ MenuItem lampkSubmenu[] = {
 };
 
 MenuItem garlandSubmenu[] = {
+  // ON/OFF, але будемо поруч показувати стан [ON] чи [OFF]
   {"ON/OFF",   true, nullptr, 0, ACTION_GARLAND},
 };
 
@@ -117,6 +120,22 @@ struct MenuState {
   int selected;
 };
 std::vector<MenuState> menuStack;
+
+//-------------------------------------------------------------
+// ФУНКЦІЯ ПРИЙОМУ ПОВІДОМЛЕНЬ (ДОДАНО)
+//-------------------------------------------------------------
+void receivedCallback(uint32_t from, String &msg) {
+  // Коли віддалена нода шле "garl0" => вимкнено; "garl1" => увімкнено
+  if (msg.equals("garl0")) {
+    garlandState = 0;
+  }
+  else if (msg.equals("garl1")) {
+    garlandState = 1;
+  }
+
+  // Якщо хочете бачити інші повідомлення:
+  // Serial.printf("Got msg from %u: %s\n", from, msg.c_str());
+}
 
 //-------------------------------------------------------------
 // Анімація індикатора передавання
@@ -209,7 +228,6 @@ void coreScreen() {
 
     //--- МЕНЮ (OS3) ---
     case OS3: {
-
       mainScreenSprite.fillScreen(BLACK);
 
       mainScreenSprite.setFont(&fonts::Font4);
@@ -219,7 +237,7 @@ void coreScreen() {
 
       String menuTitle = "Menu";
       
-      if (!menuStack.empty()) {// Якщо стек не порожній, значить ми в підменю
+      if (!menuStack.empty()) { // Якщо стек не порожній, значить ми в підменю
         MenuState &parentState = menuStack.back();
         MenuItem  &parentItem  = parentState.menu[parentState.selected];
         
@@ -227,9 +245,8 @@ void coreScreen() {
         menuTitle += parentItem.title;
       }
 
-      mainScreenSprite.drawString(menuTitle, 10, 0);// Малюємо зібраний заголовок
-
-      mainScreenSprite.setTextColor(WHITE);// Далі малюємо риску, а потім - пункти меню:
+      mainScreenSprite.drawString(menuTitle, 10, 0); 
+      mainScreenSprite.setTextColor(WHITE); 
       mainScreenSprite.drawFastHLine(0, 20, mainScreenSprite.width(), RED);
 
       int startY = 30;
@@ -239,19 +256,32 @@ void coreScreen() {
         bool online = isNodeOnline(currentMenu[i].nodeId);
 
         if (i == selectedIndex) {
-          // Виділяємо пункт
           mainScreenSprite.fillRect(0, y, mainScreenSprite.width(), 20, BLUE);
           mainScreenSprite.setTextColor(BLACK);
         } else {
           mainScreenSprite.setTextColor(online ? WHITE : DARKGREY);
         }
-        mainScreenSprite.setTextSize(1);
+
         String titleText = String(currentMenu[i].title);
+
+        // ---- ДОДАНО: якщо ми в підменю garland (garlandSubmenu),
+        //              то до пункту "ON/OFF" додамо [ON]/[OFF]/[???]
+        if (currentMenu == garlandSubmenu && i == 0) {
+          if (garlandState == 1) {
+            titleText += " [ON]";
+          } else if (garlandState == 0) {
+            titleText += " [OFF]";
+          } else {
+            titleText += " [???]";
+          }
+        }
+
+        mainScreenSprite.setTextSize(1);
         mainScreenSprite.drawString(titleText, 10, y);
 
-        int16_t mainTextWidth = mainScreenSprite.textWidth(titleText);
-
-        if (!currentMenu[i].isAction) { // якшо не головне меню то убрати надпис
+        // Якщо пункти не є екшнами, малюємо online/offline
+        if (!currentMenu[i].isAction) {
+          int16_t mainTextWidth = mainScreenSprite.textWidth(titleText);
           mainScreenSprite.setTextSize(0.5);
 
           String statusPart = online ? " [online]" : " [offline]";
@@ -287,16 +317,14 @@ void handleInput() {
         menuStack.clear();
         inputSprite.fillSprite(BLACK);
         inputSprite.pushSprite(0, 135 - 28);
-
         screen = OS0;
         return;
 
-      case 's':// OPT+s => Введення (OS1)
+      case 's': // OPT+s => Введення (OS1)
         if (state.opt) {
           isInputMode        = true;
           projectorPilotMode = false;
           inputData          = "> ";
-
           screen = OS1;
           return;
         }
@@ -305,11 +333,10 @@ void handleInput() {
         }
         break;
 
-      case 'p':// OPT+p => Пілот (OS2)
+      case 'p': // OPT+p => Пілот (OS2)
         if (state.opt) {
           isInputMode        = false;
           projectorPilotMode = true;
-
           screen = OS2;
           return;
         }
@@ -323,10 +350,9 @@ void handleInput() {
         }
         break;
 
-      case 'm':// Виклик меню екран OS3
+      case 'm': // Виклик меню (OS3)
         if (state.opt) {
           screen = OS3;
-
           currentMenu     = mainMenuItems;
           currentMenuSize = mainMenuCount;
           selectedIndex   = 0;
@@ -342,7 +368,6 @@ void handleInput() {
         if (screen == OS3) {
           selectedIndex--;
           if (selectedIndex < 0) selectedIndex = currentMenuSize - 1;
-
           return;
         }
         if (projectorPilotMode) {
@@ -356,7 +381,6 @@ void handleInput() {
         if (screen == OS3) {
           selectedIndex++;
           if (selectedIndex >= currentMenuSize) selectedIndex = 0;
-
           return;
         }
         if (projectorPilotMode) {
@@ -389,18 +413,25 @@ void handleInput() {
       case '/': // вправо
         if (screen == OS3) {
           MenuItem& item = currentMenu[selectedIndex];
-        if (item.isAction) {// Виконуємо дію
-          performAction(item.actionID);
-          sendIRCommand(220, 0);
-        // Лишаємося в цьому ж меню
-        } else {// Перехід у підменю
-          menuStack.push_back({currentMenu, currentMenuSize, selectedIndex});
-          currentMenu     = item.submenu;
-          currentMenuSize = item.submenuCount;
-          selectedIndex   = 0;
+          if (item.isAction) {
+            // Виконуємо дію
+            performAction(item.actionID);
+            sendIRCommand(220, 0);
+            // Лишаємося в тому ж меню
+          } else {
+            // Переходимо в підменю
+            if (&item == &mainMenuItems[2]) { 
+              // Запит стану
+              mesh.sendSingle(2224853816, "garland_echo");
+              garlandState = -1; // поки що невідомо, чекаємо відповіді
+            }
+            menuStack.push_back({currentMenu, currentMenuSize, selectedIndex});
+            currentMenu     = item.submenu;
+            currentMenuSize = item.submenuCount;
+            selectedIndex   = 0;
+          }
+          return;
         }
-        return;
-      }
         if (projectorPilotMode) {
           IrSender.sendNECRaw(0xF50AFC03, 0);
           sendIRCommand(32, 105);
@@ -416,7 +447,7 @@ void handleInput() {
         }
         break;
 
-      default:// Усі інші символи
+      default: // Усі інші символи
         if (isInputMode) {
           inputData += x;
         }
@@ -424,11 +455,11 @@ void handleInput() {
     }
   }
 
-  if ((state.del && inputData.length() > 2) && ( isInputMode )) {// DEL
+  if ((state.del && inputData.length() > 2) && isInputMode) { // DEL
     inputData.remove(inputData.length() - 1);
   }
 
-  if (state.enter && isInputMode) {// Enter (якщо ми в OS1)
+  if (state.enter && isInputMode) { // Enter (якщо ми в OS1)
     isInputMode = false;
     String savedText = inputData.substring(2);
     mesh.sendBroadcast(savedText);
@@ -437,7 +468,7 @@ void handleInput() {
     inputSprite.pushSprite(0, 135 - 28);
   }
   
-  if (state.enter && projectorPilotMode) {// Enter (якщо projectorPilotMode)
+  if (state.enter && projectorPilotMode) { // Enter (якщо projectorPilotMode)
     IrSender.sendNECRaw(0xF40BFC03, 0);
     sendIRCommand(32, 105);
   }
@@ -449,9 +480,11 @@ void handleInput() {
 
 //-------------------------------------------------------------
 void setup() {
-  mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);// Ініціалізація mesh
+  // Ініціалізація mesh + callback для прийому
+  mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
+  mesh.onReceive(&receivedCallback); 
 
-  auto cfg = M5.config();// Ініціалізація M5Cardputer
+  auto cfg = M5.config();
   M5Cardputer.begin(cfg, true);
   M5Cardputer.Display.setRotation(1);
   M5Cardputer.Display.setTextColor(GREEN);
@@ -459,26 +492,22 @@ void setup() {
   M5Cardputer.Display.setFont(&fonts::Orbitron_Light_24);
   M5Cardputer.Display.setTextSize(1);
 
-  IrSender.begin(DISABLE_LED_FEEDBACK);// Ініціалізація IR
+  IrSender.begin(DISABLE_LED_FEEDBACK);
   IrSender.setSendPin(IR_TX_PIN);
 
+  int w = M5Cardputer.Display.width();  
+  int h = M5Cardputer.Display.height(); 
+  mainScreenSprite.createSprite(w, h);  
+  pilotModeSprite.createSprite(w, h);   
+  indicatorSprite.createSprite(16, 16); 
+  inputSprite.createSprite(240, 28);    
 
-  int w = M5Cardputer.Display.width();  // Створення спрайтів
-  int h = M5Cardputer.Display.height(); //
-  mainScreenSprite.createSprite(w, h);  //
-  pilotModeSprite.createSprite(w, h);   //
-  indicatorSprite.createSprite(16, 16); //
-  inputSprite.createSprite(240, 28);    //
-
-  screen = OS0;// Початковий екран
+  screen = OS0; // Початковий екран
 }
 
 void loop() {
   coreScreen();
-
   mesh.update();
-
   M5Cardputer.update();
-
   handleInput();
 }
