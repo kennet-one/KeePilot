@@ -25,6 +25,7 @@ LGFX_Sprite inputSprite(&M5Cardputer.Display);
 //------------------------ ПОЛЕ ФІДБЕКА ------------------
 // -1 = невідомо, 0 = вимкнена, 1 = увімкнена
 int garlandState = -1;  
+int bdsdState = -1;  
 
 //------------------------ ЕКРАНИ (ENUM) ----------------------
 enum CORESCREEN {
@@ -95,7 +96,6 @@ MenuItem lampkSubmenu[] = {
 };
 
 MenuItem garlandSubmenu[] = {
-  // ON/OFF, але будемо поруч показувати стан [ON] чи [OFF]
   {"ON/OFF",   true, nullptr, 0, ACTION_GARLAND},
 };
 
@@ -133,8 +133,12 @@ void receivedCallback(uint32_t from, String &msg) {
     garlandState = 1;
   }
 
-  // Якщо хочете бачити інші повідомлення:
-  // Serial.printf("Got msg from %u: %s\n", from, msg.c_str());
+  if (msg.equals("bdsdl0")) {
+    bdsdState = 0;
+  }
+  else if (msg.equals("bdsdl1")) {
+    bdsdState = 1;
+  }
 }
 
 //-------------------------------------------------------------
@@ -275,7 +279,15 @@ void coreScreen() {
             titleText += " [???]";
           }
         }
-
+        if (currentMenu == bedsideSubmenu && i == 0) {
+          if (bdsdState == 1) {
+            titleText += " [ON]";
+          } else if (bdsdState == 0) {
+            titleText += " [OFF]";
+          } else {
+            titleText += " [???]";
+          }
+        }
         mainScreenSprite.setTextSize(1);
         mainScreenSprite.drawString(titleText, 10, y);
 
@@ -424,6 +436,11 @@ void handleInput() {
               // Запит стану
               mesh.sendSingle(2224853816, "garland_echo");
               garlandState = -1; // поки що невідомо, чекаємо відповіді
+            }
+            if (&item == &mainMenuItems[0]) { 
+              // Запит стану
+              mesh.sendSingle(635035530, "bedside_echo");
+              bdsdState = -1; 
             }
             menuStack.push_back({currentMenu, currentMenuSize, selectedIndex});
             currentMenu     = item.submenu;
