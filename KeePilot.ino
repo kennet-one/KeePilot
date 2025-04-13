@@ -26,6 +26,7 @@ LGFX_Sprite inputSprite(&M5Cardputer.Display);
 // -1 = невідомо, 0 = вимкнена, 1 = увімкнена
 int garlandState = -1;  
 int bdsdState = -1;  
+int lamState = -1; 
 
 //------------------------ ЕКРАНИ (ENUM) ----------------------
 enum CORESCREEN {
@@ -125,7 +126,6 @@ std::vector<MenuState> menuStack;
 // ФУНКЦІЯ ПРИЙОМУ ПОВІДОМЛЕНЬ (ДОДАНО)
 //-------------------------------------------------------------
 void receivedCallback(uint32_t from, String &msg) {
-  // Коли віддалена нода шле "garl0" => вимкнено; "garl1" => увімкнено
   if (msg.equals("garl0")) {
     garlandState = 0;
   }
@@ -138,6 +138,13 @@ void receivedCallback(uint32_t from, String &msg) {
   }
   else if (msg.equals("bdsdl1")) {
     bdsdState = 1;
+  }
+
+  if (msg.equals("La0")) {
+    lamState = 0;
+  }
+  else if (msg.equals("La1")) {
+    lamState = 1;
   }
 }
 
@@ -288,6 +295,15 @@ void coreScreen() {
             titleText += " [???]";
           }
         }
+        if (currentMenu == lampkSubmenu && i == 0) {
+          if (lamState == 1) {
+            titleText += " [ON]";
+          } else if (lamState == 0) {
+            titleText += " [OFF]";
+          } else {
+            titleText += " [???]";
+          }
+        }
         mainScreenSprite.setTextSize(1);
         mainScreenSprite.drawString(titleText, 10, y);
 
@@ -433,13 +449,15 @@ void handleInput() {
           } else {
             // Переходимо в підменю
             if (&item == &mainMenuItems[2]) { 
-              // Запит стану
               mesh.sendSingle(2224853816, "garland_echo");
               garlandState = -1; // поки що невідомо, чекаємо відповіді
             }
             if (&item == &mainMenuItems[0]) { 
-              // Запит стану
               mesh.sendSingle(635035530, "bedside_echo");
+              bdsdState = -1; 
+            }
+            if (&item == &mainMenuItems[1]) { 
+              mesh.sendSingle(434115122, "lamech");
               bdsdState = -1; 
             }
             menuStack.push_back({currentMenu, currentMenuSize, selectedIndex});
