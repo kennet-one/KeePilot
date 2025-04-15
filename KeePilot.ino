@@ -46,6 +46,7 @@ enum ActionID {
   ACTION_BEDSIDE,
   ACTION_LAMPK,
   ACTION_GARLAND,
+  ACTION_HUMI,
 };
 
 struct MenuItem {
@@ -76,6 +77,9 @@ void performAction(ActionID id) {
       mesh.sendSingle(2224853816,"garland");
       break;
 
+    case ACTION_HUMI:
+      mesh.sendSingle(2224853816,"echo_turb");
+      break;
     default:
       break;
   }
@@ -100,14 +104,23 @@ MenuItem garlandSubmenu[] = {
   {"ON/OFF",   true, nullptr, 0, ACTION_GARLAND},
 };
 
+MenuItem humidifierSubmenu[] = {
+  {"ON/OFF",   true, nullptr, 0, ACTION_HUMI},
+  {"PUMP",   true, nullptr, 0, ACTION_HUMI},
+  {"FLOW",   true, nullptr, 0, ACTION_HUMI},
+  {"IONIC",   true, nullptr, 0, ACTION_HUMI},
+  {"LIGHT",   true, nullptr, 0, ACTION_HUMI},
+  {"LIGHT COLOR",   true, nullptr, 0, ACTION_HUMI},
+};
 // Головне меню
 MenuItem mainMenuItems[] = {
   {"bedside", false, bedsideSubmenu, 1, ACTION_NONE, 635035530},
   {"lampk",   false, lampkSubmenu,   1, ACTION_NONE, 434115122},
   {"garland", false, garlandSubmenu, 1, ACTION_NONE, 2224853816},
+  {"humidifier", false, humidifierSubmenu, 6, ACTION_NONE, 2661345693},
 };
 
-int mainMenuCount = 3;
+int mainMenuCount = 4;
 
 // «Поточне» меню, по якому ми ходимо
 MenuItem* currentMenu     = mainMenuItems;
