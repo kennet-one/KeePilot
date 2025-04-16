@@ -16,6 +16,14 @@ bool isInputMode = false;  // Режим введення тексту
 #define IR_TX_PIN 44
 bool projectorPilotMode = false; // Режим пілота
 
+// ------------------------  анімація  ------------------------
+const int LINE_HEIGHT      = 20;          // висота одного рядка
+const int VIEWPORT_TOP_Y   = 30;          // де починаються пункти
+int       maxVisibleItems;                // рахуємо у setup()
+int       firstVisibleIdx  = 0;           // індекс першого видимого пункту
+bool      needScrollAnim   = false;       // прапорець анімації
+int8_t    scrollDir        = 0;           // -1 = вгору, +1 = вниз
+
 //------------------------ СПРАЙТИ ---------------------------
 LGFX_Sprite mainScreenSprite(&M5Cardputer.Display);
 LGFX_Sprite pilotModeSprite(&M5Cardputer.Display);
@@ -62,6 +70,22 @@ bool isNodeOnline(uint32_t nodeId) {
   auto nodes = mesh.getNodeList();
   return std::find(nodes.begin(), nodes.end(), nodeId) != nodes.end();
 };
+
+void animateScroll() {
+  if (!needScrollAnim) return;
+
+  const int px = LINE_HEIGHT;     // скільки пікселів прокручуємо
+  const int step = 4;             // крок (менший → плавніше)
+  int signedPx = scrollDir * px;  // +20 або -20
+
+  for (int offset = 0; offset <= abs(signedPx); offset += step) {
+      coreScreen();                          // перемалювали список
+      mainScreenSprite.pushSprite(0, offset * -scrollDir); // зсув
+      delay(10);                             // швидкість анімації
+  }
+
+  needScrollAnim = false;    // анімація завершена
+}
 
 void performAction(ActionID id) {
   switch (id) {
@@ -274,23 +298,26 @@ void coreScreen() {
       mainScreenSprite.drawFastHLine(0, 20, mainScreenSprite.width(), RED);
 
       int startY = 30;
-      for (int i = 0; i < currentMenuSize; i++) {
-        int y = startY + i * 20;
+      for (int row = 0; row < maxVisibleItems; row++) {
+        int idx = firstVisibleIdx + row;
+        if (idx >= currentMenuSize) break;
 
-        bool online = isNodeOnline(currentMenu[i].nodeId);
+        int y = VIEWPORT_TOP_Y + row * LINE_HEIGHT;
 
-        if (i == selectedIndex) {
+        bool online = isNodeOnline(currentMenu[idx].nodeId);
+
+        if (idx == selectedIndex) {
           mainScreenSprite.fillRect(0, y, mainScreenSprite.width(), 20, BLUE);
           mainScreenSprite.setTextColor(BLACK);
         } else {
           mainScreenSprite.setTextColor(online ? WHITE : DARKGREY);
         }
 
-        String titleText = String(currentMenu[i].title);
+        String titleText = String(currentMenu[idx].title);
 
         // ---- ДОДАНО: якщо ми в підменю garland (garlandSubmenu),
         //              то до пункту "ON/OFF" додамо [ON]/[OFF]/[???]
-        if (currentMenu == garlandSubmenu && i == 0) {
+        if (currentMenu == garlandSubmenu && idx == 0) {
           if (garlandState == 1) {
             titleText += " [ON]";
           } else if (garlandState == 0) {
@@ -299,7 +326,7 @@ void coreScreen() {
             titleText += " [???]";
           }
         }
-        if (currentMenu == bedsideSubmenu && i == 0) {
+        if (currentMenu == bedsideSubmenu && idx == 0) {
           if (bdsdState == 1) {
             titleText += " [ON]";
           } else if (bdsdState == 0) {
@@ -308,7 +335,7 @@ void coreScreen() {
             titleText += " [???]";
           }
         }
-        if (currentMenu == lampkSubmenu && i == 0) {
+        if (currentMenu == lampkSubmenu && idx == 0) {
           if (lamState == 1) {
             titleText += " [ON]";
           } else if (lamState == 0) {
@@ -321,7 +348,7 @@ void coreScreen() {
         mainScreenSprite.drawString(titleText, 10, y);
 
         // Якщо пункти не є екшнами, малюємо online/offline
-        if (!currentMenu[i].isAction) {
+        if (!currentMenu[idx].isAction) {
           int16_t mainTextWidth = mainScreenSprite.textWidth(titleText);
           mainScreenSprite.setTextSize(0.5);
 
@@ -409,19 +436,34 @@ void handleInput() {
         if (screen == OS3) {
           selectedIndex--;
           if (selectedIndex < 0) selectedIndex = currentMenuSize - 1;
-          return;
         }
+        if (selectedIndex < firstVisibleIdx) {
+          firstVisibleIdx--;
+          needScrollAnim = true;
+          scrollDir      = -1;
+        }
+        firstVisibleIdx = constrain(firstVisibleIdx, 0,
+                            max(0, currentMenuSize - maxVisibleItems));
+        return;
+
         if (projectorPilotMode) {
           IrSender.sendNECRaw(0xF609FC03, 0);
           sendIRCommand(32, 105);
           return;
         }
         break;
-
       case '.': // Вниз
         if (screen == OS3) {
           selectedIndex++;
           if (selectedIndex >= currentMenuSize) selectedIndex = 0;
+
+          if (selectedIndex > firstVisibleIdx + maxVisibleItems - 1) {
+            firstVisibleIdx++;
+            needScrollAnim = true;
+            scrollDir      = +1;
+          }
+          firstVisibleIdx = constrain(firstVisibleIdx, 0,
+                            max(0, currentMenuSize - maxVisibleItems));
           return;
         }
         if (projectorPilotMode) {
@@ -549,6 +591,7 @@ void setup() {
   pilotModeSprite.createSprite(w, h);   
   indicatorSprite.createSprite(16, 16); 
   inputSprite.createSprite(240, 28);    
+  maxVisibleItems = (mainScreenSprite.height() - VIEWPORT_TOP_Y) / LINE_HEIGHT;
 
   screen = OS0; // Початковий екран
 }
@@ -558,4 +601,5 @@ void loop() {
   mesh.update();
   M5Cardputer.update();
   handleInput();
+  animateScroll(); 
 }
