@@ -17,12 +17,16 @@ bool isInputMode = false;  // Режим введення тексту
 bool projectorPilotMode = false; // Режим пілота
 
 // ------------------------  анімація  ------------------------
-const int LINE_HEIGHT      = 20;          // висота одного рядка
-const int VIEWPORT_TOP_Y   = 30;          // де починаються пункти
-int       maxVisibleItems;                // рахуємо у setup()
-int       firstVisibleIdx  = 0;           // індекс першого видимого пункту
-bool      needScrollAnim   = false;       // прапорець анімації
-int8_t    scrollDir        = 0;           // -1 = вгору, +1 = вниз
+const int		LINE_HEIGHT		= 20;	// висота одного рядка
+const int		VIEWPORT_TOP_Y	= 30;	// де починаються пункти
+const uint16_t	SCROLL_INTERVAL	= 8;	// мс між кроками (≈125 FPS)
+int				maxVisibleItems;
+int				firstVisibleIdx	= 0;
+bool			needScrollAnim	= false;
+int8_t			scrollDir		= 0;	// -1 = вгору, +1 = вниз
+int				scrollPxDone	= 0;	// скільки вже прокрутили
+uint32_t		lastScrollTick	= 0;	// час попереднього кроку
+
 
 //------------------------ СПРАЙТИ ---------------------------
 LGFX_Sprite mainScreenSprite(&M5Cardputer.Display);
@@ -72,20 +76,36 @@ bool isNodeOnline(uint32_t nodeId) {
 };
 
 void animateScroll() {
-  if (!needScrollAnim) return;
+	if (!needScrollAnim) return;
 
-  const int px = LINE_HEIGHT;     // скільки пікселів прокручуємо
-  const int step = 4;             // крок (менший → плавніше)
-  int signedPx = scrollDir * px;  // +20 або -20
+	uint32_t now = millis();
+	if (now - lastScrollTick < SCROLL_INTERVAL) return;
 
-  for (int offset = 0; offset <= abs(signedPx); offset += step) {
-      coreScreen();                          // перемалювали список
-      mainScreenSprite.pushSprite(0, offset * -scrollDir); // зсув
-      delay(10);                             // швидкість анімації
-  }
+	lastScrollTick = now;
+	scrollPxDone  += scrollDir;		// 1 px
 
-  needScrollAnim = false;    // анімація завершена
+	/* смуга меню → чорний, щоб не залишався слід */
+	M5Cardputer.Display.fillRect(
+		0,
+		VIEWPORT_TOP_Y,
+		mainScreenSprite.width(),
+		mainScreenSprite.height() - VIEWPORT_TOP_Y,
+		BLACK);
+
+	/* зсуваємо попередньо намальований спрайт */
+	mainScreenSprite.pushSprite(
+		0,
+		VIEWPORT_TOP_Y - scrollPxDone);
+
+	/* якщо пройшли всю висоту, фіксуємо новий статичний кадр */
+	if (abs(scrollPxDone) >= LINE_HEIGHT) {
+		needScrollAnim = false;
+		scrollPxDone   = 0;
+
+		coreScreen();				// тепер уже нерухомо
+	}
 }
+
 
 void performAction(ActionID id) {
   switch (id) {
@@ -439,11 +459,13 @@ void handleInput() {
         }
         if (selectedIndex < firstVisibleIdx) {
           firstVisibleIdx--;
-          needScrollAnim = true;
+          firstVisibleIdx = constrain(firstVisibleIdx, 0,
+          					max(0, currentMenuSize - maxVisibleItems));
           scrollDir      = -1;
+          needScrollAnim	= true;
+          scrollPxDone	= 0;
+          lastScrollTick	= millis();
         }
-        firstVisibleIdx = constrain(firstVisibleIdx, 0,
-                            max(0, currentMenuSize - maxVisibleItems));
         return;
 
         if (projectorPilotMode) {
@@ -459,8 +481,10 @@ void handleInput() {
 
           if (selectedIndex > firstVisibleIdx + maxVisibleItems - 1) {
             firstVisibleIdx++;
+            scrollDir        = +1;
             needScrollAnim = true;
-            scrollDir      = +1;
+            scrollPxDone     = 0;		// обнуляємо прогрес
+            lastScrollTick   = millis();
           }
           firstVisibleIdx = constrain(firstVisibleIdx, 0,
                             max(0, currentMenuSize - maxVisibleItems));
@@ -597,7 +621,9 @@ void setup() {
 }
 
 void loop() {
-  coreScreen();
+  if (!needScrollAnim) {
+    coreScreen();
+  }
   mesh.update();
   M5Cardputer.update();
   handleInput();
