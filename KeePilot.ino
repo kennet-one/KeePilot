@@ -4,398 +4,251 @@
 #include "mash_parameter.h"
 #include <IRremote.hpp>
 
-//------------------------ MESH НАЛАШТУВАННЯ ------------------------
-Scheduler userScheduler;
-painlessMesh  mesh;
+/* ---------- MESH ---------- */
+Scheduler		userScheduler;
+painlessMesh	mesh;
 
-//------------------------ ЗМІННІ ВВОДУ ----------------------------
-String inputData = "";
-bool isInputMode = false;  // Режим введення тексту
+/* ---------- INPUT --------- */
+String			inputData = "";
+bool			isInputMode = false;
 
-//------------------------ IR-НАЛАШТУВАННЯ -------------------------
+/* ---------- IR ------------ */
 #define IR_TX_PIN 44
-bool projectorPilotMode = false; // Режим пілота
+bool			projectorPilotMode = false;
 
-// ------------------------  анімація  ------------------------
-const int		LINE_HEIGHT		= 20;	// висота одного рядка
-const int		VIEWPORT_TOP_Y	= 30;	// де починаються пункти
-const uint16_t	SCROLL_INTERVAL	= 8;	// мс між кроками (≈125 FPS)
+/* ---------- SCROLL -------- */
+const int		LINE_HEIGHT		= 20;
+const int		VIEWPORT_TOP_Y	= 30;
+const int		HEADER_HEIGHT	= 20;
+const uint16_t	SCROLL_INTERVAL	= 8;
 int				maxVisibleItems;
 int				firstVisibleIdx	= 0;
 bool			needScrollAnim	= false;
-int8_t			scrollDir		= 0;	// -1 = вгору, +1 = вниз
-int				scrollPxDone	= 0;	// скільки вже прокрутили
-uint32_t		lastScrollTick	= 0;	// час попереднього кроку
+int8_t			scrollDir		= 0;
+int				scrollPxDone	= 0;
+uint32_t		lastScrollTick	= 0;
 
+/* ---------- SPRITES ------- */
+LGFX_Sprite		headerSprite(&M5Cardputer.Display);
+LGFX_Sprite		menuSprite(&M5Cardputer.Display);
+LGFX_Sprite		pilotSprite(&M5Cardputer.Display);
+LGFX_Sprite		indicatorSprite(&M5Cardputer.Display);
+LGFX_Sprite		inputSprite(&M5Cardputer.Display);
 
-//------------------------ СПРАЙТИ ---------------------------
-LGFX_Sprite mainScreenSprite(&M5Cardputer.Display);
-LGFX_Sprite pilotModeSprite(&M5Cardputer.Display);
-LGFX_Sprite indicatorSprite(&M5Cardputer.Display);
-LGFX_Sprite inputSprite(&M5Cardputer.Display);
+/* ---------- FLAGS --------- */
+bool			menuDirty		= true;
 
-//------------------------ ПОЛЕ ФІДБЕКА ------------------
-// -1 = невідомо, 0 = вимкнена, 1 = увімкнена
-int garlandState = -1;  
-int bdsdState = -1;  
-int lamState = -1; 
+/* ---------- STATES -------- */
+int	garlandState = -1;
+int	bdsdState	 = -1;
+int	lamState	 = -1;
 
-//------------------------ ЕКРАНИ (ENUM) ----------------------
-enum CORESCREEN {
-  OS0,   // Головний екран (вольтаж)
-  OS1,   // Екран введення
-  OS2,   // Пілот проектора
-  OS3,   // Меню (графічне)
-  OS4
-} screen = OS0;
-
-//=============================================================
-//                МЕНЮ: СТРУКТУРА ТА ЛОГІКА
-//=============================================================
+/* ---------- ENUMS --------- */
+enum CORESCREEN { OS0, OS1, OS2, OS3, OS4 } screen = OS0;
 
 enum ActionID {
-  ACTION_NONE = 0,
-  ACTION_BEDSIDE,
-  ACTION_LAMPK,
-  ACTION_GARLAND,
-  ACTION_HUMI,
+	ACTION_NONE = 0,
+	ACTION_BEDSIDE,
+	ACTION_LAMPK,
+	ACTION_GARLAND,
+	ACTION_HUMI
 };
 
 struct MenuItem {
-  const char* title;    
-  bool isAction;
-  MenuItem* submenu;
-  int submenuCount;
-  ActionID actionID;    
-  uint32_t nodeId; // ID ноди для перевірки online-статусу
+	const char*	title;
+	bool		isAction;
+	MenuItem*	submenu;
+	int			submenuCount;
+	ActionID	actionID;
+	uint32_t	nodeId;
 };
 
-bool isNodeOnline(uint32_t nodeId) {
-  auto nodes = mesh.getNodeList();
-  return std::find(nodes.begin(), nodes.end(), nodeId) != nodes.end();
+/* ---------- MENU DATA ----- */
+MenuItem bedsideSubmenu[] = { { "ON/OFF", true, nullptr, 0, ACTION_BEDSIDE } };
+MenuItem lampkSubmenu[]   = { { "ON/OFF", true, nullptr, 0, ACTION_LAMPK  } };
+MenuItem garlandSubmenu[] = { { "ON/OFF", true, nullptr, 0, ACTION_GARLAND } };
+MenuItem humidifierSubmenu[] = {
+	{ "ON/OFF", true, nullptr, 0, ACTION_HUMI },
+	{ "PUMP", true, nullptr, 0, ACTION_HUMI },
+	{ "FLOW", true, nullptr, 0, ACTION_HUMI },
+	{ "IONIC", true, nullptr, 0, ACTION_HUMI },
+	{ "LIGHT", true, nullptr, 0, ACTION_HUMI },
+	{ "LIGHT COLOR", true, nullptr, 0, ACTION_HUMI },
 };
 
-void animateScroll() {
-	if (!needScrollAnim) return;
+MenuItem mainMenuItems[] = {
+	{ "bedside",    false, bedsideSubmenu,	 1, ACTION_NONE, 635035530 },
+	{ "lampk",      false, lampkSubmenu,	 1, ACTION_NONE, 434115122 },
+	{ "garland",    false, garlandSubmenu,  1, ACTION_NONE, 2224853816 },
+	{ "humidifier", false, humidifierSubmenu, 6, ACTION_NONE, 2661345693 }
+};
+int				mainMenuCount	= 4;
+MenuItem*		currentMenu		= mainMenuItems;
+int				currentMenuSize = mainMenuCount;
+int				selectedIndex	= 0;
 
-	uint32_t now = millis();
-	if (now - lastScrollTick < SCROLL_INTERVAL) return;
+/* ---------- STACK --------- */
+struct MenuState { MenuItem* menu; int menuSize; int selected; };
+std::vector<MenuState> menuStack;
 
-	lastScrollTick = now;
-	scrollPxDone  += scrollDir;		// 1 px
+/* ---------- HELPERS ------- */
+bool isNodeOnline(uint32_t id) {
+	auto lst = mesh.getNodeList();
+	return std::find(lst.begin(), lst.end(), id) != lst.end();
+}
 
-	/* смуга меню → чорний, щоб не залишався слід */
-	M5Cardputer.Display.fillRect(
-		0,
-		VIEWPORT_TOP_Y,
-		mainScreenSprite.width(),
-		mainScreenSprite.height() - VIEWPORT_TOP_Y,
-		BLACK);
-
-	/* зсуваємо попередньо намальований спрайт */
-	mainScreenSprite.pushSprite(
-		0,
-		VIEWPORT_TOP_Y - scrollPxDone);
-
-	/* якщо пройшли всю висоту, фіксуємо новий статичний кадр */
-	if (abs(scrollPxDone) >= LINE_HEIGHT) {
-		needScrollAnim = false;
-		scrollPxDone   = 0;
-
-		coreScreen();				// тепер уже нерухомо
+void performAction(ActionID id) {
+	switch (id) {
+		case ACTION_BEDSIDE:	mesh.sendSingle(635035530, "bedside");		 break;
+		case ACTION_LAMPK:		mesh.sendSingle(434115122, "lam");			 break;
+		case ACTION_GARLAND:	mesh.sendSingle(2224853816, "garland");		 break;
+		case ACTION_HUMI:		mesh.sendSingle(2224853816, "echo_turb");	 break;
+		default: break;
 	}
 }
 
-
-void performAction(ActionID id) {
-  switch (id) {
-    case ACTION_BEDSIDE:
-      mesh.sendSingle(635035530,"bedside");
-      break;
-
-    case ACTION_LAMPK:
-      mesh.sendSingle(434115122,"lam");
-      break;
-
-    case ACTION_GARLAND:
-      mesh.sendSingle(2224853816,"garland");
-      break;
-
-    case ACTION_HUMI:
-      mesh.sendSingle(2224853816,"echo_turb");
-      break;
-    default:
-      break;
-  }
+/* ---------- INDICATOR IR -- */
+void sendIRCommand(int x, int y) {
+	indicatorSprite.fillScreen(BLACK);
+	indicatorSprite.fillCircle(8, 8, 7, GREEN);
+	indicatorSprite.pushSprite(x, y);
+	delay(300);
+	indicatorSprite.fillScreen(BLACK);
+	indicatorSprite.fillCircle(8, 8, 7, YELLOW);
+	indicatorSprite.pushSprite(x, y);
+	delay(300);
 }
 
-void onMenuItemSelected(MenuItem &item) {
-  if (item.isAction) {
-    performAction(item.actionID);
-  }
+/* ---------- ANIMATION ----- */
+void animateScroll() {
+	if (!needScrollAnim) return;
+	if (millis() - lastScrollTick < SCROLL_INTERVAL) return;
+	lastScrollTick = millis();
+
+	scrollPxDone += scrollDir;
+	menuSprite.pushSprite(0, VIEWPORT_TOP_Y - scrollPxDone);
+
+	if (scrollDir > 0)
+		M5Cardputer.Display.fillRect(
+			0,
+			VIEWPORT_TOP_Y + menuSprite.height() - scrollDir,
+			menuSprite.width(), scrollDir, BLACK);
+	else
+		M5Cardputer.Display.fillRect(
+			0,
+			VIEWPORT_TOP_Y - scrollDir,
+			menuSprite.width(), -scrollDir, BLACK);
+
+	if (abs(scrollPxDone) >= LINE_HEIGHT) {
+		needScrollAnim = false;
+		scrollPxDone   = 0;
+		menuDirty      = true;
+	}
 }
 
-// Підменю
-MenuItem bedsideSubmenu[] = {
-  {"ON/OFF",      true, nullptr, 0, ACTION_BEDSIDE},
-};
-
-MenuItem lampkSubmenu[] = {
-  {"ON/OFF",      true, nullptr, 0, ACTION_LAMPK},
-};
-
-MenuItem garlandSubmenu[] = {
-  {"ON/OFF",   true, nullptr, 0, ACTION_GARLAND},
-};
-
-MenuItem humidifierSubmenu[] = {
-  {"ON/OFF",   true, nullptr, 0, ACTION_HUMI},
-  {"PUMP",   true, nullptr, 0, ACTION_HUMI},
-  {"FLOW",   true, nullptr, 0, ACTION_HUMI},
-  {"IONIC",   true, nullptr, 0, ACTION_HUMI},
-  {"LIGHT",   true, nullptr, 0, ACTION_HUMI},
-  {"LIGHT COLOR",   true, nullptr, 0, ACTION_HUMI},
-};
-// Головне меню
-MenuItem mainMenuItems[] = {
-  {"bedside", false, bedsideSubmenu, 1, ACTION_NONE, 635035530},
-  {"lampk",   false, lampkSubmenu,   1, ACTION_NONE, 434115122},
-  {"garland", false, garlandSubmenu, 1, ACTION_NONE, 2224853816},
-  {"humidifier", false, humidifierSubmenu, 6, ACTION_NONE, 2661345693},
-};
-
-int mainMenuCount = 4;
-
-// «Поточне» меню, по якому ми ходимо
-MenuItem* currentMenu     = mainMenuItems;
-int       currentMenuSize = mainMenuCount;
-int       selectedIndex   = 0;
-
-// Стек, щоб вертатися назад
-struct MenuState {
-  MenuItem* menu;
-  int menuSize;
-  int selected;
-};
-std::vector<MenuState> menuStack;
-
-//-------------------------------------------------------------
-// ФУНКЦІЯ ПРИЙОМУ ПОВІДОМЛЕНЬ (ДОДАНО)
-//-------------------------------------------------------------
-void receivedCallback(uint32_t from, String &msg) {
-  if (msg.equals("garl0")) {
-    garlandState = 0;
-  }
-  else if (msg.equals("garl1")) {
-    garlandState = 1;
-  }
-
-  if (msg.equals("bdsdl0")) {
-    bdsdState = 0;
-  }
-  else if (msg.equals("bdsdl1")) {
-    bdsdState = 1;
-  }
-
-  if (msg.equals("La0")) {
-    lamState = 0;
-  }
-  else if (msg.equals("La1")) {
-    lamState = 1;
-  }
-}
-
-//-------------------------------------------------------------
-// Анімація індикатора передавання
-//-------------------------------------------------------------
-void sendIRCommand(int x,int y) {
-  indicatorSprite.fillScreen(BLACK);
-  indicatorSprite.fillCircle(8, 8, 7, GREEN);
-  indicatorSprite.pushSprite(x, y);
-  delay(500);
-
-  indicatorSprite.fillScreen(BLACK);
-  indicatorSprite.fillCircle(8, 8, 7, YELLOW);
-  indicatorSprite.pushSprite(x, y);
-  delay(500);
-}
-
-//-------------------------------------------------------------
-// ГОЛОВНА ФУНКЦІЯ МАЛЮВАННЯ ЕКРАНІВ (CORE SCREEN)
-//-------------------------------------------------------------
+/* ---------- CORE SCREEN --- */
 void coreScreen() {
-  switch (screen) {
-    //--- ГОЛОВНИЙ ЕКРАН (OS0) ---
-    case OS0: {
-      mainScreenSprite.fillScreen(BLACK);
+	switch (screen) {
+		case OS0: {
+			headerSprite.fillScreen(BLACK);
+			int v = M5Cardputer.Power.getBatteryVoltage();
+			char t[10]; sprintf(t, "%.2fV", v / 1000.0);
+			headerSprite.setFont(&fonts::Font4);
+			headerSprite.setTextSize(1);
+			headerSprite.setTextColor(WHITE);
+			headerSprite.setTextDatum(top_right);
+			headerSprite.drawString(t, headerSprite.width() - 4, 0);
+			headerSprite.pushSprite(0, 0);
+			break;
+		}
 
-      int voltageMilliVolt = M5Cardputer.Power.getBatteryVoltage();
-      float voltage        = voltageMilliVolt / 1000.0;
+		case OS3: {
+			/* --- header --- */
+			headerSprite.fillScreen(BLACK);
+			headerSprite.setFont(&fonts::Font4);
+			headerSprite.setTextSize(1);
+			headerSprite.setTextColor(GREEN);
+			headerSprite.setTextDatum(textdatum_t::top_left);
 
-      char voltageText[10];
-      sprintf(voltageText, "%.2fV", voltage);
+			String title = "Menu";
+			if (!menuStack.empty()) {
+				auto& p = menuStack.back();
+				title += " -> ";
+				title += p.menu[p.selected].title;
+			}
+			headerSprite.drawString(title, 10, 0);
+			headerSprite.setTextColor(WHITE);
+			headerSprite.drawFastHLine(0, 18, headerSprite.width(), RED);
+			headerSprite.pushSprite(0, 0);
 
-      mainScreenSprite.setFont(&fonts::Font4);
-      mainScreenSprite.setTextSize(1);
-      mainScreenSprite.setTextColor(WHITE);
-      mainScreenSprite.setTextDatum(top_right);
+			/* --- list --- */
+			if (menuDirty) {
+				menuSprite.fillScreen(BLACK);
+				menuSprite.setFont(&fonts::Font4);
+				menuSprite.setTextSize(1);
+				menuSprite.setTextDatum(textdatum_t::top_left);
 
-      int screenWidth = mainScreenSprite.width();
-      mainScreenSprite.drawString(voltageText, screenWidth - 4, 2);
+				for (int row = 0; row < maxVisibleItems; row++) {
+					int idx = firstVisibleIdx + row;
+					if (idx >= currentMenuSize) break;
+					int y = row * LINE_HEIGHT;
+					bool on = isNodeOnline(currentMenu[idx].nodeId);
 
-      mainScreenSprite.pushSprite(0, 0);
-      }
-      break;
+					menuSprite.setTextColor(
+						(idx == selectedIndex) ? BLACK : (on ? WHITE : DARKGREY));
 
-    //--- ЕКРАН ВВЕДЕННЯ ТЕКСТУ (OS1) ---
-    case OS1: {
-      inputSprite.fillScreen(BLACK);
-      inputSprite.pushSprite(0, 0);
+					if (idx == selectedIndex)
+						menuSprite.fillRect(0, y, menuSprite.width(), LINE_HEIGHT, BLUE);
 
-      inputSprite.fillSprite(0x404040);
-      inputSprite.setFont(&fonts::Font4);
-      inputSprite.setTextSize(1);
-      inputSprite.setTextColor(WHITE);
-      inputSprite.setCursor(0, 0);
+					String s = currentMenu[idx].title;
+					if (currentMenu == garlandSubmenu && idx == 0)
+						s += garlandState == 1 ? " [ON]" :
+							 garlandState == 0 ? " [OFF]" : " [???]";
+					if (currentMenu == bedsideSubmenu && idx == 0)
+						s += bdsdState == 1 ? " [ON]" :
+							 bdsdState == 0 ? " [OFF]" : " [???]";
+					if (currentMenu == lampkSubmenu && idx == 0)
+						s += lamState == 1 ? " [ON]" :
+							 lamState == 0 ? " [OFF]" : " [???]";
 
-      // Надрукуємо поточне inputData
-      inputSprite.print(inputData);
-      inputSprite.pushSprite(0, 135 - 28);
-      }
-      break;
+					menuSprite.drawString(s, 10, y);
 
-    //--- ЕКРАН "ПІЛОТ ПРОЕКТОРА" (OS2) ---
-    case OS2: {
-      pilotModeSprite.fillScreen(BLACK);
-      pilotModeSprite.setFont(&fonts::Font4);
-      pilotModeSprite.setTextColor(GREEN);
-      pilotModeSprite.setTextDatum(middle_center);
-      pilotModeSprite.setTextSize(1);
+					if (!currentMenu[idx].isAction) {
+						int16_t w = menuSprite.textWidth(s);
+						menuSprite.setTextSize(0.5);
+						menuSprite.drawString(on ? " [online]" : " [offline]",
+							20 + w, y + 5);
+						menuSprite.setTextSize(1);
+					}
+				}
+				menuDirty = false;
+			}
+			menuSprite.pushSprite(0, VIEWPORT_TOP_Y);
+			break;
+		}
 
-      pilotModeSprite.drawString("ProjectorPilot Mode", 120, 12);
-      pilotModeSprite.drawFastHLine(0, 20, pilotModeSprite.width(), RED);
-
-      pilotModeSprite.drawString("P-power",       50, 50);
-      pilotModeSprite.drawString("`-exit",       140, 50);
-      pilotModeSprite.drawString("ok",           210, 50);
-      pilotModeSprite.drawString("space-sourse", 160, 75);
-
-      // стрілки
-      pilotModeSprite.drawTriangle(60, 70, 55, 80, 65, 80, GREEN);
-      pilotModeSprite.fillTriangle(60, 70, 55, 80, 65, 80, GREEN);
-      pilotModeSprite.drawTriangle(60, 110, 55, 100, 65, 100, GREEN);
-      pilotModeSprite.fillTriangle(60, 110, 55, 100, 65, 100, GREEN);
-      pilotModeSprite.drawTriangle(40, 90, 50, 85, 50, 95, GREEN);
-      pilotModeSprite.fillTriangle(40, 90, 50, 85, 50, 95, GREEN);
-      pilotModeSprite.drawTriangle(80, 90, 70, 85, 70, 95, GREEN);
-      pilotModeSprite.fillTriangle(80, 90, 70, 85, 70, 95, GREEN);
-
-      pilotModeSprite.pushSprite(0, 0);
-      }
-      break;
-
-    //--- МЕНЮ (OS3) ---
-    case OS3: {
-      mainScreenSprite.fillScreen(BLACK);
-
-      mainScreenSprite.setFont(&fonts::Font4);
-      mainScreenSprite.setTextSize(1);
-      mainScreenSprite.setTextColor(GREEN);
-      mainScreenSprite.setTextDatum(textdatum_t::top_left);
-
-      String menuTitle = "Menu";
-      
-      if (!menuStack.empty()) { // Якщо стек не порожній, значить ми в підменю
-        MenuState &parentState = menuStack.back();
-        MenuItem  &parentItem  = parentState.menu[parentState.selected];
-        
-        menuTitle += " -> ";
-        menuTitle += parentItem.title;
-      }
-
-      mainScreenSprite.drawString(menuTitle, 10, 0); 
-      mainScreenSprite.setTextColor(WHITE); 
-      mainScreenSprite.drawFastHLine(0, 20, mainScreenSprite.width(), RED);
-
-      int startY = 30;
-      for (int row = 0; row < maxVisibleItems; row++) {
-        int idx = firstVisibleIdx + row;
-        if (idx >= currentMenuSize) break;
-
-        int y = VIEWPORT_TOP_Y + row * LINE_HEIGHT;
-
-        bool online = isNodeOnline(currentMenu[idx].nodeId);
-
-        if (idx == selectedIndex) {
-          mainScreenSprite.fillRect(0, y, mainScreenSprite.width(), 20, BLUE);
-          mainScreenSprite.setTextColor(BLACK);
-        } else {
-          mainScreenSprite.setTextColor(online ? WHITE : DARKGREY);
-        }
-
-        String titleText = String(currentMenu[idx].title);
-
-        // ---- ДОДАНО: якщо ми в підменю garland (garlandSubmenu),
-        //              то до пункту "ON/OFF" додамо [ON]/[OFF]/[???]
-        if (currentMenu == garlandSubmenu && idx == 0) {
-          if (garlandState == 1) {
-            titleText += " [ON]";
-          } else if (garlandState == 0) {
-            titleText += " [OFF]";
-          } else {
-            titleText += " [???]";
-          }
-        }
-        if (currentMenu == bedsideSubmenu && idx == 0) {
-          if (bdsdState == 1) {
-            titleText += " [ON]";
-          } else if (bdsdState == 0) {
-            titleText += " [OFF]";
-          } else {
-            titleText += " [???]";
-          }
-        }
-        if (currentMenu == lampkSubmenu && idx == 0) {
-          if (lamState == 1) {
-            titleText += " [ON]";
-          } else if (lamState == 0) {
-            titleText += " [OFF]";
-          } else {
-            titleText += " [???]";
-          }
-        }
-        mainScreenSprite.setTextSize(1);
-        mainScreenSprite.drawString(titleText, 10, y);
-
-        // Якщо пункти не є екшнами, малюємо online/offline
-        if (!currentMenu[idx].isAction) {
-          int16_t mainTextWidth = mainScreenSprite.textWidth(titleText);
-          mainScreenSprite.setTextSize(0.5);
-
-          String statusPart = online ? " [online]" : " [offline]";
-          mainScreenSprite.drawString(statusPart, 20 + mainTextWidth, y + 5);
-          mainScreenSprite.setTextSize(1);
-        }
-      }
-      mainScreenSprite.pushSprite(0, 0);
-      }
-      break;
-
-    default:
-      break;
-  }
+		default: break;
+	}
 }
 
-//-------------------------------------------------------------
-// ОБРОБКА КЛАВІАТУРИ 
-//-------------------------------------------------------------
+/* ---------- RX CALLBACK --- */
+void receivedCallback(uint32_t, String& msg) {
+	bool ch = false;
+	if (msg == "garl0") { garlandState = 0; ch = true; }
+	else if (msg == "garl1") { garlandState = 1; ch = true; }
+	else if (msg == "bdsdl0") { bdsdState = 0; ch = true; }
+	else if (msg == "bdsdl1") { bdsdState = 1; ch = true; }
+	else if (msg == "La0") { lamState = 0; ch = true; }
+	else if (msg == "La1") { lamState = 1; ch = true; }
+	if (ch) menuDirty = true;
+}
+
+/* ---------- INPUT ---------- */
 void handleInput() {
-  if (!M5Cardputer.Keyboard.isChange()) return;
-  if (!M5Cardputer.Keyboard.isPressed()) return;
+	if (!M5Cardputer.Keyboard.isChange()) return;
+	if (!M5Cardputer.Keyboard.isPressed()) return;
 
-  Keyboard_Class::KeysState state = M5Cardputer.Keyboard.keysState();
-  std::string pressedKey(state.word.begin(), state.word.end());
-
+	auto state = M5Cardputer.Keyboard.keysState();
   for (char x : state.word) {
     switch (x) {
       case '`': // вихід на OS0
@@ -453,18 +306,16 @@ void handleInput() {
         break;
 
       case ';': // Вверх
-        if (screen == OS3) {
-          selectedIndex--;
-          if (selectedIndex < 0) selectedIndex = currentMenuSize - 1;
-        }
-        if (selectedIndex < firstVisibleIdx) {
-          firstVisibleIdx--;
-          firstVisibleIdx = constrain(firstVisibleIdx, 0,
-          					max(0, currentMenuSize - maxVisibleItems));
-          scrollDir      = -1;
-          needScrollAnim	= true;
-          scrollPxDone	= 0;
-          lastScrollTick	= millis();
+				if (screen == OS3) {
+					selectedIndex = (selectedIndex - 1 + currentMenuSize) % currentMenuSize;
+					if (!needScrollAnim) menuDirty = true;
+					if (selectedIndex < firstVisibleIdx) {
+						firstVisibleIdx--;
+						scrollDir      = -1;
+						needScrollAnim = true;
+						scrollPxDone   = 0;
+						lastScrollTick = millis();
+          }
         }
         return;
 
@@ -475,20 +326,17 @@ void handleInput() {
         }
         break;
       case '.': // Вниз
-        if (screen == OS3) {
-          selectedIndex++;
-          if (selectedIndex >= currentMenuSize) selectedIndex = 0;
-
-          if (selectedIndex > firstVisibleIdx + maxVisibleItems - 1) {
-            firstVisibleIdx++;
-            scrollDir        = +1;
-            needScrollAnim = true;
-            scrollPxDone     = 0;		// обнуляємо прогрес
-            lastScrollTick   = millis();
-          }
-          firstVisibleIdx = constrain(firstVisibleIdx, 0,
-                            max(0, currentMenuSize - maxVisibleItems));
+				if (screen == OS3) {
+					selectedIndex = (selectedIndex + 1) % currentMenuSize;
+					if (!needScrollAnim) menuDirty = true;
+					if (selectedIndex > firstVisibleIdx + maxVisibleItems - 1) {
+						firstVisibleIdx++;
+						scrollDir      = +1;
+						needScrollAnim = true;
+						scrollPxDone   = 0;
+						lastScrollTick = millis();
           return;
+          }
         }
         if (projectorPilotMode) {
           IrSender.sendNECRaw(0xFE01FC03, 0);
@@ -503,14 +351,14 @@ void handleInput() {
           sendIRCommand(32, 105);
           return;
         }
-        if (screen == OS3) {
-          if (!menuStack.empty()) {
-            MenuState st = menuStack.back();
-            menuStack.pop_back();
-
-            currentMenu     = st.menu;
-            currentMenuSize = st.menuSize;
-            selectedIndex   = st.selected;
+				if (screen == OS3) {
+					if (!menuStack.empty()) {
+						auto st = menuStack.back(); menuStack.pop_back();
+						currentMenu     = st.menu;
+						currentMenuSize = st.menuSize;
+						selectedIndex   = st.selected;
+						firstVisibleIdx = std::max(0, selectedIndex - maxVisibleItems + 1);
+						menuDirty       = true;
           } else {
             screen = OS0;
           }
@@ -540,9 +388,11 @@ void handleInput() {
               bdsdState = -1; 
             }
             menuStack.push_back({currentMenu, currentMenuSize, selectedIndex});
-            currentMenu     = item.submenu;
-            currentMenuSize = item.submenuCount;
-            selectedIndex   = 0;
+						currentMenu     = item.submenu;
+						currentMenuSize = item.submenuCount;
+						selectedIndex   = 0;
+						firstVisibleIdx = 0;
+						menuDirty       = true;
           }
           return;
         }
@@ -592,40 +442,33 @@ void handleInput() {
   }
 }
 
-//-------------------------------------------------------------
+/* ---------- SETUP --------- */
 void setup() {
-  // Ініціалізація mesh + callback для прийому
-  mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
-  mesh.onReceive(&receivedCallback); 
+	mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
+	mesh.onReceive(&receivedCallback);
 
-  auto cfg = M5.config();
-  M5Cardputer.begin(cfg, true);
-  M5Cardputer.Display.setRotation(1);
-  M5Cardputer.Display.setTextColor(GREEN);
-  M5Cardputer.Display.setTextDatum(middle_center);
-  M5Cardputer.Display.setFont(&fonts::Orbitron_Light_24);
-  M5Cardputer.Display.setTextSize(1);
+	auto cfg = M5.config();
+	M5Cardputer.begin(cfg, true);
+	M5Cardputer.Display.setRotation(1);
 
-  IrSender.begin(DISABLE_LED_FEEDBACK);
-  IrSender.setSendPin(IR_TX_PIN);
+	int w = M5Cardputer.Display.width();
+	int h = M5Cardputer.Display.height();
+	headerSprite.createSprite(w, HEADER_HEIGHT);
+	menuSprite.createSprite(w, h - VIEWPORT_TOP_Y);
+	pilotSprite.createSprite(w, h);
+	indicatorSprite.createSprite(16, 16);
+	inputSprite.createSprite(240, 28);
+	maxVisibleItems = (h - VIEWPORT_TOP_Y) / LINE_HEIGHT;
 
-  int w = M5Cardputer.Display.width();  
-  int h = M5Cardputer.Display.height(); 
-  mainScreenSprite.createSprite(w, h);  
-  pilotModeSprite.createSprite(w, h);   
-  indicatorSprite.createSprite(16, 16); 
-  inputSprite.createSprite(240, 28);    
-  maxVisibleItems = (mainScreenSprite.height() - VIEWPORT_TOP_Y) / LINE_HEIGHT;
-
-  screen = OS0; // Початковий екран
+	IrSender.begin(DISABLE_LED_FEEDBACK);
+	IrSender.setSendPin(IR_TX_PIN);
 }
 
+/* ---------- LOOP ---------- */
 void loop() {
-  if (!needScrollAnim) {
-    coreScreen();
-  }
-  mesh.update();
-  M5Cardputer.update();
-  handleInput();
-  animateScroll(); 
+	if (!needScrollAnim) coreScreen();
+	mesh.update();
+	M5Cardputer.update();
+	handleInput();
+	animateScroll();
 }
