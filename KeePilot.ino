@@ -1,22 +1,19 @@
+// nodeId = 1127818912
 #include "M5Cardputer.h"
 #include "M5GFX.h"
 #include "painlessMesh.h"
 #include "mash_parameter.h"
 #include <IRremote.hpp>
 
-/* ---------- MESH ---------- */
 Scheduler		userScheduler;
 painlessMesh	mesh;
 
-/* ---------- INPUT --------- */
 String			inputData = "";
 bool			isInputMode = false;
 
-/* ---------- IR ------------ */
 #define IR_TX_PIN 44
 bool			projectorPilotMode = false;
 
-/* ---------- SCROLL -------- */
 const int		LINE_HEIGHT		= 20;
 const int		VIEWPORT_TOP_Y	= 30;
 const int		HEADER_HEIGHT	= 20;
@@ -28,22 +25,18 @@ int8_t			scrollDir		= 0;
 int				scrollPxDone	= 0;
 uint32_t		lastScrollTick	= 0;
 
-/* ---------- SPRITES ------- */
 LGFX_Sprite		headerSprite(&M5Cardputer.Display);
 LGFX_Sprite		menuSprite(&M5Cardputer.Display);
-LGFX_Sprite		pilotSprite(&M5Cardputer.Display);
+LGFX_Sprite		pilotModeSprite(&M5Cardputer.Display);
 LGFX_Sprite		indicatorSprite(&M5Cardputer.Display);
 LGFX_Sprite		inputSprite(&M5Cardputer.Display);
 
-/* ---------- FLAGS --------- */
 bool			menuDirty		= true;
 
-/* ---------- STATES -------- */
 int	garlandState = -1;
 int	bdsdState	 = -1;
 int	lamState	 = -1;
 
-/* ---------- ENUMS --------- */
 enum CORESCREEN { OS0, OS1, OS2, OS3, OS4 } screen = OS0;
 
 enum ActionID {
@@ -63,7 +56,6 @@ struct MenuItem {
 	uint32_t	nodeId;
 };
 
-/* ---------- MENU DATA ----- */
 MenuItem bedsideSubmenu[] = { { "ON/OFF", true, nullptr, 0, ACTION_BEDSIDE } };
 MenuItem lampkSubmenu[]   = { { "ON/OFF", true, nullptr, 0, ACTION_LAMPK  } };
 MenuItem garlandSubmenu[] = { { "ON/OFF", true, nullptr, 0, ACTION_GARLAND } };
@@ -87,11 +79,9 @@ MenuItem*		currentMenu		= mainMenuItems;
 int				currentMenuSize = mainMenuCount;
 int				selectedIndex	= 0;
 
-/* ---------- STACK --------- */
 struct MenuState { MenuItem* menu; int menuSize; int selected; };
 std::vector<MenuState> menuStack;
 
-/* ---------- HELPERS ------- */
 bool isNodeOnline(uint32_t id) {
 	auto lst = mesh.getNodeList();
 	return std::find(lst.begin(), lst.end(), id) != lst.end();
@@ -107,7 +97,6 @@ void performAction(ActionID id) {
 	}
 }
 
-/* ---------- INDICATOR IR -- */
 void sendIRCommand(int x, int y) {
 	indicatorSprite.fillScreen(BLACK);
 	indicatorSprite.fillCircle(8, 8, 7, GREEN);
@@ -119,7 +108,6 @@ void sendIRCommand(int x, int y) {
 	delay(300);
 }
 
-/* ---------- ANIMATION ----- */
 void animateScroll() {
 	if (!needScrollAnim) return;
 	if (millis() - lastScrollTick < SCROLL_INTERVAL) return;
@@ -146,7 +134,6 @@ void animateScroll() {
 	}
 }
 
-/* ---------- CORE SCREEN --- */
 void coreScreen() {
 	switch (screen) {
 		case OS0: {
@@ -162,8 +149,50 @@ void coreScreen() {
 			break;
 		}
 
+
+    //--- ЕКРАН ВВЕДЕННЯ ТЕКСТУ (OS1) ---More actions
+
+    case OS1: {
+      inputSprite.fillScreen(BLACK);
+      inputSprite.pushSprite(0, 0);
+      inputSprite.fillSprite(0x404040);
+      inputSprite.setFont(&fonts::Font4);
+      inputSprite.setTextSize(1);
+      inputSprite.setTextColor(WHITE);
+      inputSprite.setCursor(0, 0);
+      // Надрукуємо поточне inputData
+      inputSprite.print(inputData);
+      inputSprite.pushSprite(0, 135 - 28);
+      }
+      break;
+
+    case OS2: {
+      pilotModeSprite.fillScreen(BLACK);
+      pilotModeSprite.setFont(&fonts::Font4);
+      pilotModeSprite.setTextColor(GREEN);
+      pilotModeSprite.setTextDatum(middle_center);
+      pilotModeSprite.setTextSize(1);
+      pilotModeSprite.drawString("ProjectorPilot Mode", 120, 12);
+      pilotModeSprite.drawFastHLine(0, 20, pilotModeSprite.width(), RED);
+      pilotModeSprite.drawString("P-power",       50, 50);
+      pilotModeSprite.drawString("`-exit",       140, 50);
+      pilotModeSprite.drawString("ok",           210, 50);
+      pilotModeSprite.drawString("space-sourse", 160, 75);
+      // стрілки
+      pilotModeSprite.drawTriangle(60, 70, 55, 80, 65, 80, GREEN);
+      pilotModeSprite.fillTriangle(60, 70, 55, 80, 65, 80, GREEN);
+      pilotModeSprite.drawTriangle(60, 110, 55, 100, 65, 100, GREEN);
+      pilotModeSprite.fillTriangle(60, 110, 55, 100, 65, 100, GREEN);
+      pilotModeSprite.drawTriangle(40, 90, 50, 85, 50, 95, GREEN);
+      pilotModeSprite.fillTriangle(40, 90, 50, 85, 50, 95, GREEN);
+      pilotModeSprite.drawTriangle(80, 90, 70, 85, 70, 95, GREEN);
+      pilotModeSprite.fillTriangle(80, 90, 70, 85, 70, 95, GREEN);
+      pilotModeSprite.pushSprite(0, 0);
+      }
+      break;
+
 		case OS3: {
-			/* --- header --- */
+
 			headerSprite.fillScreen(BLACK);
 			headerSprite.setFont(&fonts::Font4);
 			headerSprite.setTextSize(1);
@@ -181,7 +210,6 @@ void coreScreen() {
 			headerSprite.drawFastHLine(0, 18, headerSprite.width(), RED);
 			headerSprite.pushSprite(0, 0);
 
-			/* --- list --- */
 			if (menuDirty) {
 				menuSprite.fillScreen(BLACK);
 				menuSprite.setFont(&fonts::Font4);
@@ -231,7 +259,6 @@ void coreScreen() {
 	}
 }
 
-/* ---------- RX CALLBACK --- */
 void receivedCallback(uint32_t, String& msg) {
 	bool ch = false;
 	if (msg == "garl0") { garlandState = 0; ch = true; }
@@ -243,7 +270,6 @@ void receivedCallback(uint32_t, String& msg) {
 	if (ch) menuDirty = true;
 }
 
-/* ---------- INPUT ---------- */
 void handleInput() {
 	if (!M5Cardputer.Keyboard.isChange()) return;
 	if (!M5Cardputer.Keyboard.isPressed()) return;
@@ -442,7 +468,6 @@ void handleInput() {
   }
 }
 
-/* ---------- SETUP --------- */
 void setup() {
 	mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
 	mesh.onReceive(&receivedCallback);
@@ -455,7 +480,7 @@ void setup() {
 	int h = M5Cardputer.Display.height();
 	headerSprite.createSprite(w, HEADER_HEIGHT);
 	menuSprite.createSprite(w, h - VIEWPORT_TOP_Y);
-	pilotSprite.createSprite(w, h);
+	pilotModeSprite.createSprite(w, h);
 	indicatorSprite.createSprite(16, 16);
 	inputSprite.createSprite(240, 28);
 	maxVisibleItems = (h - VIEWPORT_TOP_Y) / LINE_HEIGHT;
@@ -464,7 +489,6 @@ void setup() {
 	IrSender.setSendPin(IR_TX_PIN);
 }
 
-/* ---------- LOOP ---------- */
 void loop() {
 	if (!needScrollAnim) coreScreen();
 	mesh.update();
